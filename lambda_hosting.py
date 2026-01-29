@@ -1,0 +1,87 @@
+import base64
+import json
+from urllib import parse
+import traceback
+
+from param_parser import ParamParser
+from req_wrapper import ReqWrapper
+from resp_builder import RespBuilder
+
+
+"""
+
+https://docs.aws.amazon.com/lambda/latest/dg/urls-invocation.html
+
+Context:
+https://docs.aws.amazon.com/lambda/latest/dg/python-context.html
+stuff just about the runtime context
+"""
+
+
+class LambdaHosting:
+
+    def __init__(self):
+        self.util = ParamParser()
+
+    def handle_request(self, app, event, context):
+        try:
+            req = self.pack_request(event, context)
+            resp = app.handle(req)
+            return self.format_response(resp)
+        except Exception as ex:
+            tb = traceback.format_exc()
+            print(tb)
+            return {
+                "statusCode": 500,
+                "headers": {
+                    "Content-type": 'application/json'
+                },
+                "body": json.dumps({
+                    "event": event,
+                    "trace": tb
+                }, indent=2),
+                "isBase64Encoded": False
+            }
+
+    def pack_request(self, event, context):
+        req = ReqWrapper()
+        req.method = event['requestContext']['http']['method']
+        req.body = {}
+        req.query = {}
+        req.form = {}
+        req.file = {}
+
+        req.headers = {}
+        for k in event["headers"].keys():
+            req.headers[k] = event["headers"].get(k)
+            req.headers[k.lower()] = event["headers"].get(k)
+
+        body = {}
+        if event.get("body"):
+            body = event["body"]
+            if event["isBase64Encoded"]:
+                body = base64.b64decode(body)
+                body = body.decode('utf-8')
+
+        if req.headers.get('content-type') == 'application/json':
+            req.body = json.loads(body)
+        else:
+            req.body = self.util.to_param_dict(parse.parse_qs(body, keep_blank_values=True))
+
+        req.path = event.get("rawPath")
+        req.host = req.headers['host']
+
+        req.query = self.util.to_param_dict(parse.parse_qs(event.get("rawQueryString"), keep_blank_values=True))
+        return req
+
+    def format_response(self, resp:RespBuilder):
+
+        return {
+            "statusCode": resp.status,
+            "headers": resp.headers,
+            "body": resp.body,
+            "isBase64Encoded": False
+        }
+
+
+
