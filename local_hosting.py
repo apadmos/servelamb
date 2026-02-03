@@ -3,10 +3,10 @@ import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib import parse
 
-from multipart_parser import MultiPartParser
-from param_parser import ParamParser
-from req_wrapper import ReqWrapper
-from resp_builder import RespBuilder
+from .multipart_parser import MultiPartParser
+from .param_parser import ParamParser
+from .req_wrapper import ReqWrapper
+from .resp_builder import RespBuilder
 
 
 class LocalServer(BaseHTTPRequestHandler):

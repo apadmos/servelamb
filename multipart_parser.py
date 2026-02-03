@@ -1,4 +1,4 @@
-from req_wrapper import ReqWrapper
+from .req_wrapper import ReqWrapper
 
 
 class MultiPartParser(object):

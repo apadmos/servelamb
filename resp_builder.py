@@ -8,7 +8,7 @@ import uuid
 
 from jinja2 import Environment, select_autoescape, FunctionLoader
 
-from jinja_helpers import words_split, date_format, date_input_format
+from .jinja_helpers import words_split, date_format, date_input_format
 
 
 class RespBuilder(object):
