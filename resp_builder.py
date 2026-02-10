@@ -6,7 +6,7 @@ import sys
 import urllib.parse
 import uuid
 
-from jinja2 import Environment, select_autoescape, FunctionLoader
+from jinja2 import Environment, select_autoescape, FunctionLoader, StrictUndefined
 
 from .jinja_helpers import words_split, date_format, date_input_format
 
@@ -92,7 +92,8 @@ class RespBuilder(object):
             """May need file system loader here https://jinja.palletsprojects.com/en/3.0.x/api/#jinja2.PackageLoader"""
             self._jinja = Environment(
                 loader=FunctionLoader(self.load_template),
-                autoescape=select_autoescape())
+                autoescape=select_autoescape(),
+                undefined=StrictUndefined)
             self._jinja.filters["date"] = date_format
             self._jinja.filters["input_date"] = date_input_format
             self._jinja.filters["words"] = words_split
@@ -116,7 +117,7 @@ class RespBuilder(object):
         rendered = template.render(data)
         return self.html(rendered)
 
-    def template_redirect(self, goto:str, title:str = None, message:str = None):
+    def template_redirect(self, goto: str, title: str = None, message: str = None):
         return self.template(data={
             "goto": goto,
             "title": title,
