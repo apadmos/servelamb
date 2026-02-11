@@ -116,12 +116,10 @@ class RespBuilder(object):
         rendered = template.render(data)
         return self.html(rendered)
 
-    def template_redirect(self, goto: str, title: str = None, message: str = None):
-        return self.template(data={
-            "goto": goto,
-            "title": title,
-            "message": message
-        }, template_path="redirect.html")
+    def js_redirect(self, goto: str):
+        return self.html(f"""<html><body><title>Redirecting...</title>
+        <script>setTimeout(function () {{ window.location.replace("{goto}");}}, 0);</script>
+<a href="{goto}">Click here to continue</a></body></html>""")
 
     def not_found(self, message: str):
         return self.error(message=message, status_code=404)
@@ -141,7 +139,7 @@ class RespBuilder(object):
         :param key: User defined name
         :param value: user defined value
         :param max_age: max seconds to allow cookie to live
-        :param mode: Lax (domain and subdomains), Strict (exact domain match), Ndone (anything)
+        :param mode: Lax (domain and subdomains), Strict (exact domain match), None (anything)
         :param http_only: Can't be accessed by JS
         :return: self
         """
@@ -149,7 +147,9 @@ class RespBuilder(object):
         kv[key] = value
         cooks = urllib.parse.urlencode(kv)
 
-        cookie_string = f"{cooks}; Max-Age={max_age.total_seconds()}; SameSite={mode}"
+        expiration = datetime.datetime.now(tz=datetime.timezone.utc) + max_age
+
+        cookie_string = f"{cooks}; Max-Age={max_age.total_seconds()}; SameSite={mode}; Expires={expiration.strftime('%a, %d-%b-%Y %H:%M:%S GMT')}"
         if http_only:
             cookie_string += "; HttpOnly"
 
