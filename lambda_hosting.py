@@ -26,6 +26,8 @@ class LambdaHosting:
         try:
             req = self.pack_request(event, context)
             resp = app.handle(req)
+            if resp.status in [500, 404]:
+                resp.body += json.dumps(event, indent=2)
             return self.format_response(resp)
         except Exception as ex:
             tb = traceback.format_exc()
@@ -44,7 +46,7 @@ class LambdaHosting:
 
     def pack_request(self, event, context):
         req = ReqWrapper()
-        req.method = event['requestContext']['http']['method']
+        req.method = event['requestContext']['httpMethod']
         req.body = {}
         req.query = {}
         req.form = {}
@@ -67,10 +69,26 @@ class LambdaHosting:
         else:
             req.body = self.util.to_param_dict(parse.parse_qs(body, keep_blank_values=True))
 
-        req.path = event.get("rawPath")
+        req.path = event["path"]
         req.host = req.headers['host']
 
-        req.query = self.util.to_param_dict(parse.parse_qs(event.get("rawQueryString"), keep_blank_values=True))
+        """ 
+        "queryStringParameters": {
+          "single": "one",
+          "test": "two"
+        },
+        "multiValueQueryStringParameters": {
+          "single": [
+            "one"
+          ],
+          "test": [
+            "one",
+            "two"
+          ]
+        },"""
+        qs = event["queryStringParameters"]
+
+        req.query = self.util.to_param_dict(qs)
         return req
 
     def format_response(self, resp: RespBuilder):

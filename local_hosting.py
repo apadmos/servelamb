@@ -1,5 +1,6 @@
 import json
 import sys
+import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib import parse
 
@@ -62,7 +63,8 @@ class LocalServer(BaseHTTPRequestHandler):
             if resp.cache_output:
                 # https://stackoverflow.com/questions/7071763/max-value-for-cache-control-header-in-http
                 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
-                self.send_header("Cache-Control", "private, max-age=31536000, max-stale=3153600, stale-while-revalidate=3153600, stale-if-error=3153600, immutable")
+                self.send_header("Cache-Control",
+                                 "private, max-age=31536000, max-stale=3153600, stale-while-revalidate=3153600, stale-if-error=3153600, immutable")
             self.end_headers()
 
             if write:
@@ -84,7 +86,17 @@ class LocalServer(BaseHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Methods", "*")
                 self.send_header("Content-type", "text")
                 self.end_headers()
-                self.wfile.write(f"""Server error {ex}""".encode())
+
+                stack = traceback.format_exc()
+                content = f"""Error processing request: {e}
+                    ----💥--🤮-🧯-🔥-🤯-🔥-😬-😭---💥--
+                    {stack}""".replace("\n", "<br>")
+                error_page = f"""<!DOCTYPE html><html lang="en">
+                    <style>body{{color:red;}}</style>
+                    <head><meta charset="UTF-8">
+                    <title>Error</title></head>
+                    <body>{content}</body></html>"""
+                self.wfile.write(error_page.encode())
             except Exception as superex:
                 print("error handling request exception")
                 print(superex)
@@ -104,7 +116,6 @@ class LocalServer(BaseHTTPRequestHandler):
 
     def do_PUT(self):
         self.process(method='PUT')
-
 
     def do_OPTIONS(self):
         self.send_response(200)

@@ -1,5 +1,4 @@
 import os
-import traceback
 
 from .req_wrapper import ReqWrapper
 from .resp_builder import RespBuilder
@@ -84,69 +83,56 @@ class ServerApp(object):
                            server_prefix=self.server_prefix,
                            jinja_pipes=self.jinja_pipes,
                            jinja_functions=self.jinja_functions)
-        try:
-            req.static_dir = self.static_dir
-            req.template_dir = self.template_dir
-            req.static_prefix = self.static_prefix
-            req.server_prefix = self.server_prefix
+        req.static_dir = self.static_dir
+        req.template_dir = self.template_dir
+        req.static_prefix = self.static_prefix
+        req.server_prefix = self.server_prefix
 
-            """expand the various sources of params into one location"""
-            if isinstance(req.body, list):
-                req.params = Digest(body_array=req.body, **req.query)
-            else:
-                req.params = Digest(**req.query)
-                for key in req.body:
-                    req.params[key] = req.body[key]
+        """expand the various sources of params into one location"""
+        if isinstance(req.body, list):
+            req.params = Digest(body_array=req.body, **req.query)
+        else:
+            req.params = Digest(**req.query)
+            for key in req.body:
+                req.params[key] = req.body[key]
 
-            """If there is a controller route that matches this path, use that first"""
-            route, path_params = self.router.route(req.path, req.method)
-            for path_param in path_params:
-                req.params[path_param] = path_params[path_param]
-            if route:
-                instance, function, auth_param = route
-                req.auth_param = auth_param
-                """if you found a route that is registered to handle this request"""
-                """first process middleware"""
-                if self.middleware and not self.middleware.process(req, resp):
-                    """if middleware doesn't return Truthy it wants to end the request"""
-                    return resp
-                """then do the route action"""
-                function(req, resp)
+        """If there is a controller route that matches this path, use that first"""
+        route, path_params = self.router.route(req.path, req.method)
+        for path_param in path_params:
+            req.params[path_param] = path_params[path_param]
+        if route:
+            instance, function, auth_param = route
+            req.auth_param = auth_param
+            """if you found a route that is registered to handle this request"""
+            """first process middleware"""
+            if self.middleware and not self.middleware.process(req, resp):
+                """if middleware doesn't return Truthy it wants to end the request"""
                 return resp
+            """then do the route action"""
+            function(req, resp)
+            return resp
 
-            """There's no matching controller route, search for a matching static file"""
-            if not self.static_dir:
-                resp.not_found(f'server route {req.method} {req.path} not found and static files are not configured')
-                return resp
+        """There's no matching controller route, search for a matching static file"""
+        if not self.static_dir:
+            resp.not_found(f'server route {req.method} {req.path} not found and static files are not configured')
+            return resp
 
-            name, ext = os.path.splitext(req.path)
-            """unify all paths to start with / """
-            name = name.strip(" /\\")
-            """if the path starts with the static pathing prefix, strip it out cause we're only looking
-            at static files at this point"""
-            local_prefix = self.static_prefix.lstrip("/")
-            name = name[len(local_prefix):] if name.startswith(local_prefix) else name
+        name, ext = os.path.splitext(req.path)
+        """unify all paths to start with / """
+        name = name.strip(" /\\")
+        """if the path starts with the static pathing prefix, strip it out cause we're only looking
+        at static files at this point"""
+        local_prefix = self.static_prefix.lstrip("/")
+        name = name[len(local_prefix):] if name.startswith(local_prefix) else name
 
-            """attempt to serve the static file as is"""
-            fpath = os.path.join(self.static_dir, name + ext)
+        """attempt to serve the static file as is"""
+        fpath = os.path.join(self.static_dir, name + ext)
+        if os.path.isfile(fpath):
+            return resp.file(fpath)
+
+        if not ext:
+            fpath = os.path.join(self.static_dir, name, "index.html")
             if os.path.isfile(fpath):
                 return resp.file(fpath)
 
-            if not ext:
-                fpath = os.path.join(self.static_dir, name, "index.html")
-                if os.path.isfile(fpath):
-                    return resp.file(fpath)
-
-            return resp.not_found(f'route {req.method} {req.path} {fpath} not found')
-        except Exception as e:
-            stack = traceback.format_exc()
-            content = f"""Error processing request: {e}
-            ----💥--🤮-🧯-🔥-🤯-🔥-😬-😭---💥--
-            {stack}""".replace("\n", "<br>")
-            error_page = f"""<!DOCTYPE html><html lang="en">
-            <style>body{{color:red;}}</style>
-            <head><meta charset="UTF-8">
-            <title>Error</title></head>
-            <body>{content}</body></html>"""
-            resp.status_code = 500
-            return resp.html(error_page)
+        return resp.not_found(f'route {req.method} {req.path} {fpath} not found')
