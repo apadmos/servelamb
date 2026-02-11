@@ -27,7 +27,7 @@ class LambdaHosting:
             req = self.pack_request(event, context)
             resp = app.handle(req)
             if resp.status in [500, 404]:
-                resp.body += json.dumps(event, indent=2)
+                return self.format_response(resp, additional_context=json.dumps(event, indent=2))
             return self.format_response(resp)
         except Exception as ex:
             tb = traceback.format_exc()
@@ -91,11 +91,18 @@ class LambdaHosting:
         req.query = self.util.to_param_dict(qs)
         return req
 
-    def format_response(self, resp: RespBuilder):
+    def format_response(self, resp: RespBuilder, additional_context: str = None):
+
+        body = resp.body
+        if additional_context:
+            if "<html" in body.lower():
+                body += f"<div>{additional_context}</div>"
+            else:
+                body += f"\n\n{additional_context}"
 
         return {
             "statusCode": resp.status,
             "headers": resp.headers,
-            "body": resp.body,
+            "body": body,
             "isBase64Encoded": False
         }

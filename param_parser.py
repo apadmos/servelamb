@@ -1,9 +1,9 @@
-
-
 class ParamParser:
 
     def to_param_dict(self, parsed_query):
         rdict = {}
+        if not parsed_query:
+            return rdict
         for k in parsed_query:
             if not parsed_query[k]:
                 # be explicit about empty arrays of values
