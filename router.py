@@ -51,7 +51,8 @@ class Router(object):
                     for function_name in dir(controller_instance):
                         function = getattr(controller_instance, function_name)
                         if hasattr(function, 'web_method') and function.web_method:
-                            auth_param = function.auth_wrapper_param if hasattr(function, 'auth_wrapper_param') else None
+                            auth_param = function.auth_wrapper_param if hasattr(function,
+                                                                                'auth_wrapper_param') else None
                             for path in function.web_paths:
                                 cls.register_method(method=function.web_method,
                                                     path=path,
@@ -125,9 +126,51 @@ def put(path: str = None):
     return Router.create_path_decorator(path=path, method='PUT')
 
 
-def auth(permissions):
-    def auth_decorator(func):
-        func.auth_wrapper_param = permissions
-        return func
+def require_cookie(cookie_name: str, redirect: str = None):
+    """
+    Class decorator that enforces cookie presence on all @get/@post decorated methods.
 
-    return auth_decorator
+    Args:
+        cookie_name: Name of the required cookie
+        redirect: Optional redirect path if cookie is missing (default: None returns 401)
+    """
+
+    def class_decorator(cls):
+        # Iterate through all attributes of the class
+        for attr_name in dir(cls):
+            # Skip special/private methods
+            if attr_name.startswith('_'):
+                continue
+
+            attr = getattr(cls, attr_name)
+
+            # Check if this attribute has web_paths (meaning it's decorated with @get/@post)
+            if hasattr(attr, 'web_paths') and hasattr(attr, 'web_method'):
+                # Create a wrapper function
+                def make_wrapper(original_func):
+                    def wrapper(self, req, resp):
+                        # Check for the required cookie
+                        if not req.cookie(cookie_name):
+                            if redirect:
+                                return resp.redirect(redirect)
+                            else:
+                                # Or however you want to handle unauthorized access
+                                resp.status(401)
+                                return resp.text("Unauthorized")
+
+                        # Cookie exists, call the original function
+                        return original_func(self, req, resp)
+
+                    # Preserve the web_paths and web_method attributes
+                    wrapper.web_paths = original_func.web_paths
+                    wrapper.web_method = original_func.web_method
+                    wrapper.__name__ = original_func.__name__
+
+                    return wrapper
+
+                # Replace the method with the wrapped version
+                setattr(cls, attr_name, make_wrapper(attr))
+
+        return cls
+
+    return class_decorator
