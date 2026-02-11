@@ -1,12 +1,11 @@
 import base64
 import json
-from urllib import parse
 import traceback
+from urllib import parse
 
-from param_parser import ParamParser
-from req_wrapper import ReqWrapper
-from resp_builder import RespBuilder
-
+from .param_parser import ParamParser
+from .req_wrapper import ReqWrapper
+from .resp_builder import RespBuilder
 
 """
 
@@ -74,7 +73,7 @@ class LambdaHosting:
         req.query = self.util.to_param_dict(parse.parse_qs(event.get("rawQueryString"), keep_blank_values=True))
         return req
 
-    def format_response(self, resp:RespBuilder):
+    def format_response(self, resp: RespBuilder):
 
         return {
             "statusCode": resp.status,
@@ -82,6 +81,3 @@ class LambdaHosting:
             "body": resp.body,
             "isBase64Encoded": False
         }
-
-
-
