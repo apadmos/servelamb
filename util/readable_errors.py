@@ -1,8 +1,14 @@
 import re
 
+
 class ReadableError(Exception):
-    def __init__(self, user_message:str):
+    def __init__(self, user_message: str):
         self.user_message = user_message
+
+
+class MissingArgumentException(ReadableError):
+    def __init__(self, arg_name: str):
+        ReadableError.__init__(self, f"{arg_name} is required")
 
 
 class ReadableErrors(object):
