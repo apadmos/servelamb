@@ -18,11 +18,15 @@ class Digest(dict):
         self[key] = value
 
     @classmethod
-    def from_locals(cls, locals, ignore_falsies=True):
-        del locals["self"]
-        if ignore_falsies:
-            locals = {k: v for k, v in locals.items() if v}
-        return Digest(locals)
+    def from_locals(cls, locals: dict, exclude: list[str] = None, ignore_falsies=True):
+        exclude = set(exclude) if exclude else set()
+        exclude.add("self")
+        d = Digest()
+        for k, v in locals.items():
+            if k in exclude or (ignore_falsies and not v):
+                continue
+            d[k] = v
+        return d
 
     @classmethod
     def list_of(cls, items: list):
