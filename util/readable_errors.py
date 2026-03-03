@@ -11,6 +11,11 @@ class MissingArgumentException(ReadableError):
         ReadableError.__init__(self, f"{arg_name} is required")
 
 
+class RecordNotFound(ReadableError):
+    def __init__(self, record: str):
+        ReadableError.__init__(self, f"{record} not found")
+
+
 class ReadableErrors(object):
 
     def translate_for_end_user(self, ex) -> str:
