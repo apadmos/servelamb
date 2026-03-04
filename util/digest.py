@@ -17,6 +17,11 @@ class Digest(dict):
     def __setattr__(self, key, value):
         self[key] = value
 
+    def __add__(self, other):
+        for k, v in other.items():
+            self[k] = v
+        return self
+
     @classmethod
     def from_locals(cls, locals: dict, exclude: list[str] = None, ignore_falsies=True):
         exclude = set(exclude) if exclude else set()
