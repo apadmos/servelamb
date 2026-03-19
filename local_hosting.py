@@ -38,12 +38,15 @@ class LocalServer(BaseHTTPRequestHandler):
                 req.headers[k.lower()] = self.headers.get(k)
 
             content_length = self.headers.get('content-length')
-            content_type = str(self.headers.get('content-type') or '')
+            content_type = str(self.headers.get('content-type') or '').lower()
             if self.rfile and content_length:
                 length = int(content_length)
                 if content_type.startswith("multipart/form-data;"):
                     mpp = MultiPartParser(content_length=length)
                     mpp.parse(self.rfile, content_type=content_type, req=req)
+                elif content_type.startswith("application/octet-stream"):
+                    stream_data = self.rfile.read(length)
+                    req.body = stream_data
                 else:
                     field_data = self.rfile.read(length)
                     field_data = field_data.decode()
@@ -88,7 +91,7 @@ class LocalServer(BaseHTTPRequestHandler):
                 self.end_headers()
 
                 stack = traceback.format_exc()
-                content = f"""Error processing request: {e}
+                content = f"""Error processing request: {ex}
                     ----💥--🤮-🧯-🔥-🤯-🔥-😬-😭---💥--
                     {stack}""".replace("\n", "<br>")
                 error_page = f"""<!DOCTYPE html><html lang="en">
