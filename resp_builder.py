@@ -31,7 +31,7 @@ class RespBuilder(object):
         self._jinja_functions = jinja_functions or {}
         self._session = {}
 
-    def set_session(self, session):
+    def session(self, session):
         self._session = session
 
     def serialize_helper(self, value):

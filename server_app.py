@@ -16,7 +16,7 @@ class ServerApp(object):
                  server_prefix="",
                  jinja_pipes=None,
                  jinja_functions=None,
-                 middleware=None,
+                 middleware: list = None,
                  extensions=None):
         self.router = Router()
         self.router.register(controller_directory=controller_dir)
@@ -101,15 +101,23 @@ class ServerApp(object):
         for path_param in path_params:
             req.params[path_param] = path_params[path_param]
         if route:
+            """if you found a route that is registered to handle this request"""
             instance, function, auth_param = route
             req.auth_param = auth_param
-            """if you found a route that is registered to handle this request"""
+
             """first process middleware"""
-            if self.middleware and not self.middleware.process(req, resp):
-                """if middleware doesn't return Truthy it wants to end the request"""
-                return resp
+            for middle in self.middleware or []:
+                if hasattr(middle, "pre_process"):
+                    req, resp = middle.pre_process(function, req, resp)
+
             """then do the route action"""
             function(req, resp)
+
+            """do middleware post processing, for things like session storage etc"""
+            for middle in self.middleware or []:
+                if hasattr(middle, "post_process"):
+                    req, resp = middle.post_process(function, req, resp)
+
             return resp
 
         """There's no matching controller route, search for a matching static file"""

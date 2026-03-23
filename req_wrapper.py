@@ -1,4 +1,3 @@
-import http
 import urllib.parse
 from urllib import parse
 
@@ -29,25 +28,26 @@ class ReqWrapper(object):
         }
         self.file = {
         }
-        """Sessions need to be populated by custom middleware"""
-        self.session = {}
 
-    def required_str(self, key:str):
+        """Sessions need to be populated by a session manager in  the middle"""
+        self._session_cookie = "29cc6a41e3fd"
+        self._session_cache = {}
+
+    def required_str(self, key: str):
         v = self.params.get(key)
         if not v:
             raise Exception(f"{key} is required")
         return v
 
-    def required_int(self, key:str):
+    def required_int(self, key: str):
         s = self.required_str(key)
         try:
             return int(s)
         except:
             raise Exception(f"{key} must be a valid integer")
 
-    def optional_bool(self, key:str, default:bool=False):
+    def optional_bool(self, key: str, default: bool = False):
         return bool(self.params.get("active") or default)
-
 
     def reconstitute_query_string(self):
         qs = "&".join([f"{parse.quote(str(key))}={parse.quote(str(val))}" for key, val in self.query.items()])
@@ -61,7 +61,7 @@ class ReqWrapper(object):
         """
         return self._pack_objects(self.params)
 
-    def _parse_cookies(self, cookies:str, url_decode=True):
+    def _parse_cookies(self, cookies: str, url_decode=True):
         if not cookies:
             return {}
         r = {}
@@ -79,7 +79,7 @@ class ReqWrapper(object):
                 r[key] = val
         return r
 
-    def cookie(self, key:str, url_decode=True) -> str:
+    def cookie(self, key: str, url_decode=True) -> str:
         """
         :param key: key used to set the cookie
         :param url_decode: Cookies are URL encoded when set by the resp_builder
@@ -90,7 +90,14 @@ class ReqWrapper(object):
         val = cookies.get(key)
         return val
 
-    def _grow_array_to_fit(self, source: [], desired_index: int):
+    def session_id(self) -> str:
+        sid = self.cookie(self._session_cookie)
+        return sid
+
+    def session(self) -> dict:
+        return self._session_cache
+
+    def _grow_array_to_fit(self, source: list, desired_index: int):
         while len(source) <= desired_index:
             source.append(None)
 
@@ -100,11 +107,11 @@ class ReqWrapper(object):
     return possible new dictionary with assigned value or array and value
     """
 
-    def _check_assign(self, dict: dict, key: str, default_value):
+    def _check_assign(self, d: dict, key: str, default_value):
         if '[' in key and ']' in key:
             parts = key.split('[')
             key = parts[0]
-            arr = dict.get(key) or []
+            arr = d.get(key) or []
             """Handle things like data[0][3][6]"""
             indexes = [int(i[:-1]) for i in parts[1:]]
             for index in indexes[:-1]:
@@ -115,17 +122,17 @@ class ReqWrapper(object):
             self._grow_array_to_fit(arr, index)
             if arr[index] is None:
                 arr[index] = default_value
-            dict[key] = arr
+            d[key] = arr
             return arr[index]
         else:
-            if dict.get(key) is None:
-                dict[key] = default_value
-            return dict[key]
+            if d.get(key) is None:
+                d[key] = default_value
+            return d[key]
 
-    def _pack_objects(self, dict):
+    def _pack_objects(self, d: dict):
         repack = {}
-        for key in dict:
-            val = dict[key]
+        for key in d:
+            val = d[key]
             key_parts = key.split('.')
             current_target = repack
             for i in range(0, len(key_parts)):
