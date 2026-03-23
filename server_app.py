@@ -108,7 +108,9 @@ class ServerApp(object):
             """first process middleware"""
             for middle in self.middleware or []:
                 if hasattr(middle, "pre_process"):
-                    req, resp = middle.pre_process(function, req, resp)
+                    resp_code = middle.pre_process(function, req, resp)
+                    if resp_code > 0:
+                        return resp
 
             """then do the route action"""
             function(req, resp)
@@ -116,7 +118,7 @@ class ServerApp(object):
             """do middleware post processing, for things like session storage etc"""
             for middle in self.middleware or []:
                 if hasattr(middle, "post_process"):
-                    req, resp = middle.post_process(function, req, resp)
+                    resp = middle.post_process(function, req, resp)
 
             return resp
 
