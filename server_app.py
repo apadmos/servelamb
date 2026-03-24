@@ -118,7 +118,7 @@ class ServerApp(object):
             """do middleware post processing, for things like session storage etc"""
             for middle in self.middleware or []:
                 if hasattr(middle, "post_process"):
-                    resp = middle.post_process(function, req, resp)
+                    middle.post_process(function, req, resp)
 
             return resp
 

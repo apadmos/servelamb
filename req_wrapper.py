@@ -30,7 +30,7 @@ class ReqWrapper(object):
         }
 
         """Sessions need to be populated by a session manager in  the middle"""
-        self._session_cookie = "29cc6a41e3fd"
+        self.session_cookie = "29cc6a41e3fd"
         self._session_cache = {}
 
     def required_str(self, key: str):
@@ -91,7 +91,7 @@ class ReqWrapper(object):
         return val
 
     def session_id(self) -> str:
-        sid = self.cookie(self._session_cookie)
+        sid = self.cookie(self.session_cookie)
         return sid
 
     def session(self) -> dict:
