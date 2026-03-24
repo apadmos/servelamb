@@ -39,6 +39,14 @@ class ReqWrapper(object):
             raise Exception(f"{key} is required")
         return v
 
+    def get_list(self, key: str):
+        val = self.params.get(key)
+        if not val:
+            return []
+        if isinstance(val, list):
+            return val
+        return [val]
+
     def required_int(self, key: str):
         s = self.required_str(key)
         try:
