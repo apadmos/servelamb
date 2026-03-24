@@ -96,6 +96,7 @@ class RespBuilder(object):
             self._jinja.filters["date"] = date_format
             self._jinja.filters["input_date"] = date_input_format
             self._jinja.filters["words"] = words_split
+            self._jinja.filters["words_split"] = words_split
             for pipe in self._jinja_pipes:
                 self._jinja.filters[pipe] = self._jinja_pipes[pipe]
             for func in self._jinja_functions:
