@@ -8,7 +8,7 @@ import uuid
 
 from jinja2 import Environment, select_autoescape, FunctionLoader
 
-from .jinja_helpers import words_split, date_format, date_input_format
+from .jinja_helpers import words_split, date_format, date_input_format, render_select_options
 
 
 class RespBuilder(object):
@@ -100,6 +100,8 @@ class RespBuilder(object):
             for pipe in self._jinja_pipes:
                 self._jinja.filters[pipe] = self._jinja_pipes[pipe]
             for func in self._jinja_functions:
+                self._jinja.globals["options"] = render_select_options
+                self._jinja.globals["select_options"] = render_select_options
                 self._jinja.globals[func] = self._jinja_functions[func]
         return self._jinja
 
