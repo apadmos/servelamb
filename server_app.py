@@ -14,10 +14,12 @@ class ServerApp(object):
                  template_dir="templates",
                  static_prefix="static",
                  server_prefix="",
+                 valid_cors_origins=[],
                  jinja_pipes=None,
                  jinja_functions=None,
                  middleware: list = None,
                  extensions=None):
+        self.valid_cors_origins = valid_cors_origins
         self.router = Router()
         self.router.register(controller_directory=controller_dir)
         self.extensions = extensions or []
@@ -95,6 +97,12 @@ class ServerApp(object):
             req.params = Digest(**req.query)
             for key in req.body:
                 req.params[key] = req.body[key]
+
+        """apply the policy headers that should be on all responses"""
+        if self.valid_cors_origins:
+            # self.send_header("Access-Control-Allow-Origin", host)
+            resp.headers("Access-Control-Allow-Methods", "*")
+            resp.headers("Access-Control-Allow-Credentials", "true")
 
         """If there is a controller route that matches this path, use that first"""
         route, path_params = self.router.route(req.path, req.method)

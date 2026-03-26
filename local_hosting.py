@@ -61,8 +61,6 @@ class LocalServer(BaseHTTPRequestHandler):
             for (key, val) in resp.headers.items():
                 self.send_header(key, val)
 
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Methods", "*")
             if resp.cache_output:
                 # https://stackoverflow.com/questions/7071763/max-value-for-cache-control-header-in-http
                 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control

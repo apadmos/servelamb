@@ -137,7 +137,7 @@ class RespBuilder(object):
 
     def cookie(self, key: str, value: str,
                max_age: datetime.timedelta = datetime.timedelta(days=1),
-               mode: str = "Lax", http_only: bool = True):
+               mode: str = "Lax", http_only: bool = True, path="/"):
         """
         :param key: User defined name
         :param value: user defined value
@@ -152,7 +152,7 @@ class RespBuilder(object):
 
         expiration = datetime.datetime.now(tz=datetime.timezone.utc) + max_age
 
-        cookie_string = f"{cooks}; Max-Age={max_age.total_seconds()}; SameSite={mode}; Expires={expiration.strftime('%a, %d-%b-%Y %H:%M:%S GMT')}"
+        cookie_string = f"{cooks}; Path={path}; Max-Age={max_age.total_seconds()}; SameSite={mode}; Expires={expiration.strftime('%a, %d-%b-%Y %H:%M:%S GMT')}"
         if http_only:
             cookie_string += "; HttpOnly"
 
