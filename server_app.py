@@ -117,7 +117,7 @@ class ServerApp(object):
             for middle in self.middleware or []:
                 if hasattr(middle, "pre_process"):
                     resp_code = middle.pre_process(function, req, resp)
-                    if resp_code > 0:
+                    if resp_code not in [0, 200]:
                         return resp
 
             """then do the route action"""
