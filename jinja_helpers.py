@@ -40,6 +40,7 @@ def _pull_first(d: dict, options: list[str]):
 
 def render_select_options(selected, options):
     r = []
+    found_selected = False
     for option in options:
         # Handle plain strings/primitives
         if not isinstance(option, (list, tuple, dict)):
@@ -61,6 +62,10 @@ def render_select_options(selected, options):
                 name = words_split(value)
 
         is_selected = ' selected' if str(value) == str(selected) else ''
+        if is_selected:
+            found_selected = True
         r.append(f"""<option value="{value}"{is_selected}>{name}</option>""")
+    if not found_selected:
+        r.append(f"""<option value="{selected}" selected>{selected}</option>""")
     r = "\n".join(r)
     return Markup(r)
