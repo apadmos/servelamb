@@ -6,6 +6,7 @@ import sys
 import urllib.parse
 import uuid
 
+import jinja2
 from jinja2 import Environment, select_autoescape, FunctionLoader
 
 from .jinja_helpers import words_split, date_format, date_input_format, render_select_options
@@ -116,8 +117,22 @@ class RespBuilder(object):
         data["SERVER_PREFIX"] = self._server_prefix
         data["STATIC_PREFIX"] = self._static_prefix
         data["SESSION"] = self._session
-        rendered = template.render(data)
-        return self.html(rendered)
+        try:
+            rendered = template.render(data)
+            return self.html(rendered)
+        except jinja2.UndefinedError as e:
+            # Walk the traceback to find the template frame with a lineno
+            lineno = None
+            tb = e.__traceback__
+            while tb is not None:
+                if "template" in tb.tb_frame.f_code.co_filename:
+                    lineno = tb.tb_lineno
+                tb = tb.tb_next
+            if lineno:
+                raise ValueError(
+                    f"Undefined variable on line {lineno}: {e}\n"
+                ) from e
+            raise
 
     def js_redirect(self, goto: str):
         return self.html(f"""<html><body><title>Redirecting...</title>
