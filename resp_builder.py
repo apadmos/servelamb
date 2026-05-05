@@ -9,6 +9,7 @@ import uuid
 import jinja2
 from jinja2 import Environment, select_autoescape, FunctionLoader
 
+import fancycli
 from .jinja_helpers import words_split, date_format, date_input_format, render_select_options
 
 
@@ -106,11 +107,14 @@ class RespBuilder(object):
                 self._jinja.globals[func] = self._jinja_functions[func]
         return self._jinja
 
-    def template(self, data=None, template_path=None, template_markup=None, status_code: int = None):
+    def template(self, data=None, template_path=None, template_markup=None, template_name: str = None,
+                 status_code: int = None):
         if status_code:
             self._status = status_code
         if template_markup:
             template = self.jinja().from_string(template_markup)
+            if not template.name:
+                template.name = template_name
         else:
             template = self.jinja().get_template(template_path)
         data = data or {}
@@ -121,17 +125,21 @@ class RespBuilder(object):
             rendered = template.render(data)
             return self.html(rendered)
         except jinja2.UndefinedError as e:
-            # Walk the traceback to find the template frame with a lineno
-            lineno = None
             tb = e.__traceback__
+            template_frames = []
+            if template_path:
+                fancycli.print_error(f"Root template File \"{template_path}\"")
+                print(f"File \"{template_path}\"")
+
             while tb is not None:
-                if "template" in tb.tb_frame.f_code.co_filename:
-                    lineno = tb.tb_lineno
+                filename = tb.tb_frame.f_code.co_filename
+                # Jinja2 template frames use the template name as the filename
+                if not filename.endswith(".py"):
+                    template_frames.append((filename, tb.tb_lineno))
                 tb = tb.tb_next
-            if lineno:
-                raise ValueError(
-                    f"Undefined variable on line {lineno}: {e}\n"
-                ) from e
+
+            for template_name, lineno in template_frames:
+                fancycli.print_error(f"  in '{template_name}' on line {lineno}")
             raise
 
     def js_redirect(self, goto: str):
