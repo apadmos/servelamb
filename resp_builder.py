@@ -15,7 +15,9 @@ from .jinja_helpers import words_split, date_format, date_input_format, render_s
 
 class RespBuilder(object):
 
-    def __init__(self, static_dir, template_dirs=None, static_prefix: str = '',
+    def __init__(self, static_dir, template_dirs=None,
+                 template_loader=None,
+                 static_prefix: str = '',
                  server_prefix: str = '', jinja_pipes=None, jinja_functions=None):
         self._status = 200
         self._body: str = ''
@@ -25,6 +27,7 @@ class RespBuilder(object):
         }
         self._static_dir = static_dir
         self._template_dirs = template_dirs or []
+        self._template_loader = template_loader
         self._jinja = None
         self._cache_output = False
         self._static_prefix = static_prefix
@@ -77,6 +80,10 @@ class RespBuilder(object):
         return self
 
     def load_template(self, file_path):
+        if self._template_loader:
+            loaded = self._template_loader(file_path)
+            if loaded:
+                return loaded
         if os.path.isfile(file_path):
             with open(file_path, 'r') as file:
                 return file.read()

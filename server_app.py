@@ -12,6 +12,7 @@ class ServerApp(object):
                  controller_dir="controllers",
                  static_dir="static",
                  template_dir="templates",
+                 template_loader=None,
                  static_prefix="static",
                  server_prefix="",
                  valid_cors_origins=[],
@@ -24,6 +25,7 @@ class ServerApp(object):
         self.router.register(controller_directory=controller_dir)
         self.extensions = extensions or []
         self.extension_roots = []
+        self.template_loader = template_loader
         for extension in self.extensions:
             ext_module_prefix = f"{extension.__name__}.controllers"
             ext_root = None
@@ -81,6 +83,7 @@ class ServerApp(object):
     def handle(self, req: ReqWrapper) -> RespBuilder:
         resp = RespBuilder(static_dir=self.static_dir,
                            template_dirs=self.template_dirs,
+                           template_loader=self.template_loader,
                            static_prefix=self.static_prefix,
                            server_prefix=self.server_prefix,
                            jinja_pipes=self.jinja_pipes,
