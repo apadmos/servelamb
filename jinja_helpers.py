@@ -48,6 +48,8 @@ def _pull_first(d: any, options: list[str]):
 
 
 def _pull_name_value(option: any):
+    if option is None:
+        return None, None
     # Handle plain strings/primitives
     if isinstance(option, (str, int, bool)):
         value = str(option)
@@ -71,7 +73,7 @@ def _pull_name_value(option: any):
 
 def render_select_options(options, selected=None):
     r = []
-    selected_val, selected_name = _pull_name_value(selected) if selected is not None else None, None
+    selected_val, selected_name = _pull_name_value(selected)
     found_selected = selected is None
 
     for option in options:
