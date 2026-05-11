@@ -118,12 +118,12 @@ class RespBuilder(object):
                  status_code: int = None):
         if status_code:
             self._status = status_code
-        if template_markup:
-            template = self.jinja().from_string(template_markup)
-            if not template.name:
-                template.name = template_name
-        else:
-            template = self.jinja().get_template(template_path)
+        if not template_markup:
+            template_markup = self.load_template(file_path=template_path)
+
+        template = self.jinja().from_string(template_markup)
+        template.name = template_name
+
         data = data or {}
         data["SERVER_PREFIX"] = self._server_prefix
         data["STATIC_PREFIX"] = self._static_prefix
@@ -148,6 +148,26 @@ class RespBuilder(object):
             for template_name, lineno in template_frames:
                 fancycli.print_error(f"  in '{template_name}' on line {lineno}")
             raise
+        except TypeError as te:
+            tb = te.__traceback__
+            while tb is not None:
+                filename = tb.tb_frame.f_code.co_filename
+                if not filename.endswith(".py"):
+                    lineno = tb.tb_lineno
+                    # Get the template source to extract the offending line
+                    try:
+                        lines = template_markup.splitlines()
+                        offending_line = lines[lineno - 1].strip() if lineno <= len(lines) else "<unknown>"
+                    except Exception:
+                        offending_line = "<source unavailable>"
+                    fancycli.print_error(
+                        f"TypeError in template '{filename}' on line {lineno}: {offending_line}\n  {te}"
+                    )
+                tb = tb.tb_next
+            raise te
+        except Exception as ex:
+            fancycli.print_error("Unanticipated exception type:", exception=ex)
+            raise ex
 
     def js_redirect(self, goto: str):
         return self.html(f"""<html><body><title>Redirecting...</title>
