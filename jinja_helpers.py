@@ -48,7 +48,7 @@ def _pull_first(d: any, options: list[str]):
 
 
 def _pull_name_value(option: any):
-    if option is None:
+    if not option:
         return None, None
     # Handle plain strings/primitives
     if isinstance(option, (str, int, bool)):
