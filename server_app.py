@@ -1,9 +1,9 @@
 import os
 
+from digest import Digest
 from .req_wrapper import ReqWrapper
 from .resp_builder import RespBuilder
 from .router import Router
-from .util import Digest
 
 
 class ServerApp(object):
