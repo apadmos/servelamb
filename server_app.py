@@ -87,7 +87,7 @@ class ServerApp(object):
                            static_prefix=self.static_prefix,
                            server_prefix=self.server_prefix,
                            jinja_pipes=self.jinja_pipes,
-                           jinja_functions=self.jinja_functions)
+                           jinja_functions=self.jinja_functions, req=req)
         req.static_dir = self.static_dir
         req.template_dir = self.template_dir
         req.static_prefix = self.static_prefix

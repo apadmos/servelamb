@@ -11,6 +11,7 @@ from jinja2 import Environment, select_autoescape, FunctionLoader
 
 import fancycli
 from .jinja_helpers import words_split, date_format, date_input_format, render_select_options
+from .req_wrapper import ReqWrapper
 
 
 class RespBuilder(object):
@@ -18,7 +19,7 @@ class RespBuilder(object):
     def __init__(self, static_dir, template_dirs=None,
                  template_loader=None,
                  static_prefix: str = '',
-                 server_prefix: str = '', jinja_pipes=None, jinja_functions=None):
+                 server_prefix: str = '', jinja_pipes=None, jinja_functions=None, req: ReqWrapper = None):
         self._status = 200
         self._body: str = ''
         self._file: str = ''
@@ -35,6 +36,7 @@ class RespBuilder(object):
         self._jinja_pipes = jinja_pipes
         self._jinja_functions = jinja_functions or {}
         self._session = {}
+        self.req = req
 
     def session(self, session):
         self._session = session
@@ -129,7 +131,7 @@ class RespBuilder(object):
         data["STATIC_PREFIX"] = self._static_prefix
         data["SESSION"] = self._session
         try:
-            rendered = template.render(data)
+            rendered = template.render(data, req=self.req)
             return self.html(rendered)
         except jinja2.UndefinedError as e:
             tb = e.__traceback__
