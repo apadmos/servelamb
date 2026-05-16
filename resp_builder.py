@@ -10,7 +10,7 @@ import jinja2
 from jinja2 import Environment, select_autoescape, FunctionLoader
 
 import fancycli
-from .jinja_helpers import words_split, date_format, date_input_format, render_select_options
+from .jinja_helpers import words_split, date_format, date_input_format, render_select_options, localize
 from .req_wrapper import ReqWrapper
 
 
@@ -108,6 +108,7 @@ class RespBuilder(object):
             self._jinja.filters["input_date"] = date_input_format
             self._jinja.filters["words"] = words_split
             self._jinja.filters["words_split"] = words_split
+            self._jinja.filters["localize"] = localize
             for pipe in self._jinja_pipes:
                 self._jinja.filters[pipe] = self._jinja_pipes[pipe]
             for func in self._jinja_functions:

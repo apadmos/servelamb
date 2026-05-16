@@ -1,5 +1,6 @@
 import datetime
 import re
+from zoneinfo import ZoneInfo
 
 from markupsafe import Markup
 
@@ -87,3 +88,17 @@ def render_select_options(options, selected=None):
         r.append(f"""<option value="{selected_val}" selected>{selected_name}  (Not found)</option>""")
     r = "\n".join(r)
     return Markup(r)
+
+
+LOCAL_TZ = ZoneInfo("America/New_York")
+
+
+def localize(d: datetime.datetime) -> datetime.datetime:
+    if not d:
+        return d
+
+    # If naive, assume UTC (based on your data model)
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=datetime.timezone.utc)
+
+    return d.astimezone(LOCAL_TZ)
