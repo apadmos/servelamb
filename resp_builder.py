@@ -10,7 +10,7 @@ import jinja2
 from jinja2 import Environment, select_autoescape, FunctionLoader
 
 import fancycli
-from .jinja_helpers import words_split, date_format, date_input_format, render_select_options, localize
+from .jinja_helpers import JinjaHelpers
 from .req_wrapper import ReqWrapper
 
 
@@ -104,16 +104,19 @@ class RespBuilder(object):
             self._jinja = Environment(
                 loader=FunctionLoader(self.load_template),
                 autoescape=select_autoescape())
-            self._jinja.filters["date"] = date_format
-            self._jinja.filters["input_date"] = date_input_format
-            self._jinja.filters["words"] = words_split
-            self._jinja.filters["words_split"] = words_split
-            self._jinja.filters["localize"] = localize
+            helpers = JinjaHelpers()
+            self._jinja.filters["date"] = helpers.date_format
+            self._jinja.filters["input_date"] = helpers.date_input_format
+            self._jinja.filters["words"] = helpers.words_split
+            self._jinja.filters["words_split"] = helpers.words_split
+            self._jinja.filters["localize"] = helpers.localize
             for pipe in self._jinja_pipes:
                 self._jinja.filters[pipe] = self._jinja_pipes[pipe]
+
+            self._jinja.globals["options"] = helpers.render_select_options
+            self._jinja.globals["select_options"] = helpers.render_select_options
+            self._jinja.globals["now"] = helpers.now
             for func in self._jinja_functions:
-                self._jinja.globals["options"] = render_select_options
-                self._jinja.globals["select_options"] = render_select_options
                 self._jinja.globals[func] = self._jinja_functions[func]
         return self._jinja
 
