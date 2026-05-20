@@ -104,3 +104,5 @@ class JinjaHelpers:
 
     def now(self):
         return datetime.datetime.now(tz=self.LOCAL_TZ)
+
+    """Information about supported types"""
