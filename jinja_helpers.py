@@ -2,6 +2,7 @@ import datetime
 import re
 from zoneinfo import ZoneInfo
 
+from jinja2 import Undefined
 from markupsafe import Markup
 
 
@@ -76,8 +77,11 @@ class JinjaHelpers:
         return value, name
 
     def render_select_options(self, options, selected=None):
+        if isinstance(selected, Undefined) or selected is None or selected == "":
+            selected = selected_val = selected_name = None
+        else:
+            selected_val, selected_name = self._pull_name_value(selected)
         r = []
-        selected_val, selected_name = self._pull_name_value(selected)
         found_selected = selected is None
 
         for option in options:
