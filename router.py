@@ -78,10 +78,29 @@ class Router(object):
     @classmethod
     def route(cls, path: str, method):
         key = f'{path}-{method}'
+
+        # exact match first, no scoring needed
         r = cls.ROUTES.get(key)
-        if not r:
-            for p in cls.ROUTES:
-                m = re.match(p, key)
-                if m:
-                    return cls.ROUTES[p], m.groupdict()
-        return r, {}
+        if r:
+            return r, {}
+
+        best_specificity = (-1, -1)
+        best_match = None
+        best_groups = {}
+
+        for p in cls.ROUTES:
+            m = re.match(f'^{p}$', key)
+            if m:
+                segments = p.split('/')
+                total_segments = len(segments)
+                static_segments = sum(1 for seg in segments if '(?P<' not in seg)
+                specificity = (total_segments, static_segments)
+                if specificity > best_specificity:
+                    best_specificity = specificity
+                    best_match = p
+                    best_groups = m.groupdict()
+
+        if not best_match:
+            return None, {}
+
+        return cls.ROUTES[best_match], best_groups
