@@ -54,8 +54,11 @@ class ReqWrapper(object):
         except:
             raise Exception(f"{key} must be a valid integer")
 
-    def optional_bool(self, key: str, default: bool = False):
-        return bool(self.params.get("active") or default)
+    def optional_bool(self, key: str, default: any = None):
+        v = self.params.get("active")
+        if v is None or v == '':
+            return default
+        return str(v).lower() == "true"
 
     def reconstitute_query_string(self):
         qs = "&".join([f"{parse.quote(str(key))}={parse.quote(str(val))}" for key, val in self.query.items()])
