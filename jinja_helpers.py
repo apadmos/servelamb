@@ -54,6 +54,9 @@ class JinjaHelpers:
         return None
 
     def _pull_name_value(self, option: any):
+        if isinstance(option, bool):
+            return option, option
+
         if not option:
             return None, None
         # Handle plain strings/primitives

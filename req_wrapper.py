@@ -55,7 +55,7 @@ class ReqWrapper(object):
             raise Exception(f"{key} must be a valid integer")
 
     def optional_bool(self, key: str, default: any = None):
-        v = self.params.get("active")
+        v = self.params.get(key)
         if v is None or v == '':
             return default
         return str(v).lower() == "true"
