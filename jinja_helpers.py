@@ -83,6 +83,10 @@ class JinjaHelpers:
         r = []
         if isinstance(selected, Undefined) or selected == "":
             selected = None
+
+        if isinstance(options, str):
+            options = options.split(",")
+
         selected_val, selected_name = self._pull_name_value(selected)
         found_selected = selected is None
 
