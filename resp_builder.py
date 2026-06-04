@@ -104,7 +104,7 @@ class RespBuilder(object):
             self._jinja = Environment(
                 loader=FunctionLoader(self.load_template),
                 autoescape=select_autoescape())
-            helpers = JinjaHelpers()
+            helpers = JinjaHelpers(static_prefix=self._static_prefix)
             self._jinja.filters["date"] = helpers.date_format
             self._jinja.filters["input_date"] = helpers.date_input_format
             self._jinja.filters["words"] = helpers.words_split
@@ -114,8 +114,8 @@ class RespBuilder(object):
                 self._jinja.filters[pipe] = self._jinja_pipes[pipe]
 
             self._jinja.globals["options"] = helpers.render_select_options
-            self._jinja.globals["select_options"] = helpers.render_select_options
             self._jinja.globals["now"] = helpers.now
+            self._jinja.globals["static"] = helpers.static
             for func in self._jinja_functions:
                 self._jinja.globals[func] = self._jinja_functions[func]
         return self._jinja

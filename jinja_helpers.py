@@ -8,8 +8,10 @@ from markupsafe import Markup
 
 class JinjaHelpers:
 
-    def __init__(self, time_zone: str = "America/New_York"):
-
+    def __init__(self,
+                 static_prefix: str,
+                 time_zone: str = "America/New_York"):
+        self.static_prefix = static_prefix
         self.LOCAL_TZ = ZoneInfo(time_zone)
 
     """"Generic Jinja pipe filters and functions that can be used across projects"""
@@ -114,3 +116,7 @@ class JinjaHelpers:
 
     def now(self):
         return datetime.datetime.now(tz=self.LOCAL_TZ)
+
+    def static(self, path: str):
+        path = self.static_prefix + path
+        return path
