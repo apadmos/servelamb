@@ -85,7 +85,7 @@ class LocalServer(BaseHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Access-Control-Allow-Headers", "*")
                 self.send_header("Access-Control-Allow-Methods", "*")
-                self.send_header("Content-type", "text")
+                self.send_header("Content-Type", "text")
                 self.end_headers()
 
                 stack = traceback.format_exc()

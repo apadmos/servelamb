@@ -24,7 +24,7 @@ class RespBuilder(object):
         self._body: str = ''
         self._file: str = ''
         self.headers = {
-            "Content-type": "text"
+            "Content-Type": "text"
         }
         self._static_dir = static_dir
         self._template_dirs = template_dirs or []
@@ -58,17 +58,17 @@ class RespBuilder(object):
 
             self._body = json.dumps(simpler)
         self._body = self._body
-        self.headers["Content-type"] = 'application/json'
+        self.headers["Content-Type"] = 'application/json'
         return self
 
     def text(self, body: str):
         self._body = body
-        self.headers["Content-type"] = 'text/plain'
+        self.headers["Content-Type"] = 'text/plain'
         return self
 
     def html(self, body: str):
         self._body = body
-        self.headers["Content-type"] = 'text/html'
+        self.headers["Content-Type"] = 'text/html'
         return self
 
     def static(self, relative_path):
@@ -78,7 +78,7 @@ class RespBuilder(object):
     def file(self, path, cache=True):
         self._file = path
         self._cache_output = cache
-        self.headers["Content-type"] = mimetypes.guess_type(path)[0]
+        self.headers["Content-Type"] = mimetypes.guess_type(path)[0]
         return self
 
     def load_template(self, file_path):
@@ -221,7 +221,7 @@ class RespBuilder(object):
 
     def error(self, message: str, status_code=500):
         self._body = message
-        self.headers["Content-type"] = 'text/html'
+        self.headers["Content-Type"] = 'text/html'
         self._status = status_code
         return self
 
@@ -231,7 +231,7 @@ class RespBuilder(object):
 
     @property
     def content_type(self):
-        return self.headers["Content-type"]
+        return self.headers["Content-Type"]
 
     @property
     def body(self):

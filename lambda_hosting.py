@@ -3,6 +3,7 @@ import json
 import traceback
 from urllib import parse
 
+import fancycli
 from .param_parser import ParamParser
 from .req_wrapper import ReqWrapper
 from .resp_builder import RespBuilder
@@ -22,6 +23,12 @@ class LambdaHosting:
     def __init__(self):
         self.util = ParamParser()
 
+    def try_parse(self, obj):
+        try:
+            return json.loads(json.dumps(obj, default=str))
+        except Exception:
+            return str(obj)
+
     def handle_request(self, app, event, context):
         try:
             req = self.pack_request(event, context)
@@ -31,22 +38,40 @@ class LambdaHosting:
             return self.format_response(resp)
         except Exception as ex:
             tb = traceback.format_exc()
-            print(tb)
-            return {
-                "statusCode": 500,
-                "headers": {
-                    "Content-type": 'application/json'
-                },
-                "body": json.dumps({
-                    "event": event,
-                    "trace": tb
-                }, indent=2),
-                "isBase64Encoded": False
-            }
+            fancycli.print_error("Exception handling request", ex)
+            try:
+                rv = {
+                    "statusCode": 500,
+                    "headers": {
+                        "Content-Type": 'application/json'
+                    },
+                    "body": json.dumps({
+                        "event": self.try_parse(event),
+                        "trace": self.try_parse(tb)
+                    }, indent=2),
+                    "isBase64Encoded": False
+                }
+                fancycli.print_error("About to try and return error")
+                fancycli.print_error(rv)
+                return rv
+            except Exception as ex:
+                fancycli.print_error("Exception handling request", ex)
+                return {
+                    "statusCode": 500,
+                    "headers": {
+                        "Content-Type": 'application/json'
+                    },
+                    "body": json.dumps({
+                        "error_handling_exception": self.try_parse(ex),
+                    }, indent=2),
+                    "isBase64Encoded": False
+                }
 
     def pack_request(self, event, context):
         req = ReqWrapper()
-        req.method = event['requestContext']['httpMethod']
+        """seems the same across contexts"""
+        requestContext = event['requestContext']
+        req.method = requestContext.get('httpMethod') or requestContext["http"]["method"]
         req.body = {}
         req.query = {}
         req.form = {}
@@ -69,7 +94,7 @@ class LambdaHosting:
         else:
             req.body = self.util.to_param_dict(parse.parse_qs(body, keep_blank_values=True))
 
-        req.path = event["path"]
+        req.path = event.get("path") or requestContext["http"]["path"]
         req.host = req.headers['host']
 
         """ 
@@ -86,7 +111,7 @@ class LambdaHosting:
             "two"
           ]
         },"""
-        qs = event["queryStringParameters"]
+        qs = event.get("queryStringParameters")
 
         req.query = self.util.to_param_dict(qs)
         return req
