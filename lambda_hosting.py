@@ -23,18 +23,12 @@ class LambdaHosting:
     def __init__(self):
         self.util = ParamParser()
 
-    def try_parse(self, obj):
-        try:
-            return json.loads(json.dumps(obj, default=str))
-        except Exception:
-            return str(obj)
-
     def handle_request(self, app, event, context):
         try:
             req = self.pack_request(event, context)
             resp = app.handle(req)
             if resp.status in [500, 404]:
-                return self.format_response(resp, additional_context=json.dumps(event, indent=2))
+                return self.format_response(resp, additional_context=json.dumps(event))
             return self.format_response(resp)
         except Exception as ex:
             tb = traceback.format_exc()
@@ -46,8 +40,8 @@ class LambdaHosting:
                         "Content-Type": 'application/json'
                     },
                     "body": json.dumps({
-                        "event": self.try_parse(event),
-                        "trace": self.try_parse(tb)
+                        "event": event,
+                        "trace": tb
                     }, indent=2),
                     "isBase64Encoded": False
                 }
@@ -55,15 +49,13 @@ class LambdaHosting:
                 fancycli.print_error(rv)
                 return rv
             except Exception as ex:
-                fancycli.print_error("Exception handling request", ex)
+                fancycli.print_error("Exception handling error", exception=ex)
                 return {
                     "statusCode": 500,
                     "headers": {
-                        "Content-Type": 'application/json'
+                        "Content-Type": 'text/plain'
                     },
-                    "body": json.dumps({
-                        "error_handling_exception": self.try_parse(ex),
-                    }, indent=2),
+                    "body": "Second layer exception",
                     "isBase64Encoded": False
                 }
 
@@ -119,11 +111,10 @@ class LambdaHosting:
     def format_response(self, resp: RespBuilder, additional_context: str = None):
 
         body = resp.body
+        print("HEADERS:", repr(resp.headers))
+
         if additional_context:
-            if "<html" in body.lower():
-                body += f"<div>{additional_context}</div>"
-            else:
-                body += f"\n\n{additional_context}"
+            body += f"\n\nADDITIONAL CONTEXT: \n{additional_context}"
 
         return {
             "statusCode": resp.status,
