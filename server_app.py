@@ -19,7 +19,12 @@ class ServerApp(object):
                  jinja_pipes=None,
                  jinja_functions=None,
                  middleware: list = None,
-                 extensions=None):
+                 extensions=None,
+                 before_request=None,
+                 before_response=None):
+        self.before_request = before_request
+        self.before_response = before_response
+
         self.valid_cors_origins = valid_cors_origins
         self.router = Router()
         self.router.register(controller_directory=controller_dir)
@@ -88,72 +93,79 @@ class ServerApp(object):
                            server_prefix=self.server_prefix,
                            jinja_pipes=self.jinja_pipes,
                            jinja_functions=self.jinja_functions, req=req)
-        req.static_dir = self.static_dir
-        req.template_dir = self.template_dir
-        req.static_prefix = self.static_prefix
-        req.server_prefix = self.server_prefix
+        try:
+            req.static_dir = self.static_dir
+            req.template_dir = self.template_dir
+            req.static_prefix = self.static_prefix
+            req.server_prefix = self.server_prefix
 
-        """expand the various sources of params into one location"""
-        if isinstance(req.body, list):
-            req.params = Digest(body_array=req.body, **req.query)
-        else:
-            req.params = Digest(**req.query)
-            for key in req.body:
-                req.params[key] = req.body[key]
+            """expand the various sources of params into one location"""
+            if isinstance(req.body, list):
+                req.params = Digest(body_array=req.body, **req.query)
+            else:
+                req.params = Digest(**req.query)
+                for key in req.body:
+                    req.params[key] = req.body[key]
 
-        """apply the policy headers that should be on all responses"""
-        if self.valid_cors_origins:
-            # self.send_header("Access-Control-Allow-Origin", host)
-            resp.headers("Access-Control-Allow-Methods", "*")
-            resp.headers("Access-Control-Allow-Credentials", "true")
+            """apply the policy headers that should be on all responses"""
+            if self.valid_cors_origins:
+                # self.send_header("Access-Control-Allow-Origin", host)
+                resp.headers("Access-Control-Allow-Methods", "*")
+                resp.headers("Access-Control-Allow-Credentials", "true")
 
-        """If there is a controller route that matches this path, use that first"""
-        route, path_params = self.router.route(req.path, req.method)
-        for path_param in path_params:
-            req.params[path_param] = path_params[path_param]
-        if route:
-            """if you found a route that is registered to handle this request"""
-            instance, function, auth_param = route
-            req.auth_param = auth_param
+            """If there is a controller route that matches this path, use that first"""
+            route, path_params = self.router.route(req.path, req.method)
+            for path_param in path_params:
+                req.params[path_param] = path_params[path_param]
+            if route:
+                """if you found a route that is registered to handle this request"""
+                if self.before_request:
+                    self.before_request(req, resp)
 
-            """first process middleware"""
-            for middle in self.middleware or []:
-                if hasattr(middle, "pre_process"):
-                    resp_code = middle.pre_process(function, req, resp)
-                    if resp_code not in [0, 200]:
-                        return resp
+                instance, function, auth_param = route
+                req.auth_param = auth_param
 
-            """then do the route action"""
-            function(req, resp)
+                """first process middleware"""
+                for middle in self.middleware or []:
+                    if hasattr(middle, "pre_process"):
+                        resp_code = middle.pre_process(function, req, resp)
+                        if resp_code not in [0, 200]:
+                            return resp
 
-            """do middleware post processing, for things like session storage etc"""
-            for middle in self.middleware or []:
-                if hasattr(middle, "post_process"):
-                    middle.post_process(function, req, resp)
+                """then do the route action"""
+                function(req, resp)
 
-            return resp
+                """do middleware post processing, for things like session storage etc"""
+                for middle in self.middleware or []:
+                    if hasattr(middle, "post_process"):
+                        middle.post_process(function, req, resp)
 
-        """There's no matching controller route, search for a matching static file"""
-        if not self.static_dir:
-            resp.not_found(f'server route {req.method} {req.path} not found and static files are not configured')
-            return resp
+                return resp
 
-        name, ext = os.path.splitext(req.path)
-        """unify all paths to start with / """
-        name = name.strip(" /\\")
-        """if the path starts with the static pathing prefix, strip it out cause we're only looking
-        at static files at this point"""
-        local_prefix = self.static_prefix.lstrip("/")
-        name = name[len(local_prefix):] if name.startswith(local_prefix) else name
+            """There's no matching controller route, search for a matching static file"""
+            if not self.static_dir:
+                resp.not_found(f'server route {req.method} {req.path} not found and static files are not configured')
+                return resp
 
-        """attempt to serve the static file as is"""
-        fpath = os.path.join(self.static_dir, name + ext)
-        if os.path.isfile(fpath):
-            return resp.file(fpath)
+            name, ext = os.path.splitext(req.path)
+            """unify all paths to start with / """
+            name = name.strip(" /\\")
+            """if the path starts with the static pathing prefix, strip it out cause we're only looking
+            at static files at this point"""
+            local_prefix = self.static_prefix.lstrip("/")
+            name = name[len(local_prefix):] if name.startswith(local_prefix) else name
 
-        if not ext:
-            fpath = os.path.join(self.static_dir, name, "index.html")
+            """attempt to serve the static file as is"""
+            fpath = os.path.join(self.static_dir, name + ext)
             if os.path.isfile(fpath):
                 return resp.file(fpath)
 
-        return resp.not_found(f'route {req.method} {req.path} {fpath} not found')
+            if not ext:
+                fpath = os.path.join(self.static_dir, name, "index.html")
+                if os.path.isfile(fpath):
+                    return resp.file(fpath)
+
+            return resp.not_found(f'route {req.method} {req.path} {fpath} not found')
+        finally:
+            if self.before_response:
+                self.before_response(req, resp)
