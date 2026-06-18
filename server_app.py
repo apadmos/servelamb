@@ -135,6 +135,11 @@ class ServerApp(object):
                 """then do the route action"""
                 function(req, resp)
 
+                """the caching or custom headers are "native" middleware """
+                if hasattr(function, "_headers"):
+                    for header in function._headers:
+                        resp.headers[header] = function._headers[header]
+
                 """do middleware post processing, for things like session storage etc"""
                 for middle in self.middleware or []:
                     if hasattr(middle, "post_process"):

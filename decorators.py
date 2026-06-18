@@ -25,6 +25,47 @@ def put(path: str = None):
     return _apply_web_method(path=path, method='PUT')
 
 
+def cache(max_age: int = 3600, stale_while_revalidate: int = 3600, stale_if_error: bool = True):
+    def apply(target):
+        if stale_if_error:
+            stale = " stale-if-error,"
+        else:
+            stale = ""
+        header_value = f"public,{stale} max-age={max_age}, stale-while-revalidate={stale_while_revalidate}"
+        if isinstance(target, type):
+            return _apply_header_to_cls(cls=target, name="Cache-Control", value=header_value)
+        else:
+            return _apply_header_to_func(func=target, name="Cache-Control", value=header_value)
+
+    return apply
+
+
+def header(name: str, value: str):
+    def apply(target):
+        if isinstance(target, type):
+            return _apply_header_to_cls(cls=target, name=name, value=value)
+        else:
+            return _apply_header_to_func(func=target, name=name, value=value)
+
+    return apply
+
+
+def _apply_header_to_func(func, name: str, value: str):
+    existing = getattr(func, "_headers", {})
+    existing[name] = value
+    func._headers = existing
+    return func
+
+
+def _apply_header_to_cls(cls, name: str, value: str):
+    for attr_name in dir(cls):
+        if attr_name.startswith('_'):
+            continue
+        attr = getattr(cls, attr_name)
+        setattr(cls, attr_name, _apply_header_to_func(func=attr, name=name, value=value))
+    return cls
+
+
 def auth(permission: str = None,
          namespace: str = None,
          id: str = None,
