@@ -1,6 +1,8 @@
 import os
+from urllib import parse
 
 from digest import Digest
+from .param_parser import ParamParser
 from .req_wrapper import ReqWrapper
 from .resp_builder import RespBuilder
 from .router import Router
@@ -31,6 +33,7 @@ class ServerApp(object):
         self.extensions = extensions or []
         self.extension_roots = []
         self.template_loader = template_loader
+        self.util = ParamParser()
         for extension in self.extensions:
             ext_module_prefix = f"{extension.__name__}.controllers"
             ext_root = None
@@ -98,6 +101,19 @@ class ServerApp(object):
             req.template_dir = self.template_dir
             req.static_prefix = self.static_prefix
             req.server_prefix = self.server_prefix
+
+            """Because of how shitty the AWS Cloudfront query string support is, we need to work around it
+            by using a placeholder"""
+            if "~q~" in req.path and not req.query:
+                parts = req.path.split("~q~")
+                qs = parts[1]
+                req.path = parts[0]
+                qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
+                req.query = qs
+
+            """Now that we're doctoring paths, if it's totally blank go with /"""
+            if not req.path:
+                req.path = "/"
 
             """expand the various sources of params into one location"""
             if isinstance(req.body, list):
