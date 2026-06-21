@@ -105,7 +105,7 @@ class ServerApp(object):
             """Because of how shitty the AWS Cloudfront query string support is, we need to work around it
             by using a placeholder"""
             if "~q~" in req.path and not req.query:
-                parts = req.path.split("~q~")
+                parts = req.path.split("~q~", 1)
                 qs = parts[1]
                 req.path = parts[0]
                 qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
