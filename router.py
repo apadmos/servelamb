@@ -49,11 +49,14 @@ class Router(object):
                     cls.CONTROLLERS.append(controller_instance)
                     for function_name in dir(controller_instance):
                         function = getattr(controller_instance, function_name)
-                        if hasattr(function, 'web_method') and function.web_method:
+                        if hasattr(function, 'web_methods') and function.web_methods:
                             auth_param = function.auth_wrapper_param if hasattr(function,
                                                                                 'auth_wrapper_param') else None
-                            for path in function.web_paths:
-                                cls.register_method(method=function.web_method,
+                            for web_method in function.web_methods:
+                                parts = web_method.split("-", 1)
+                                method = parts[0]
+                                path = parts[1]
+                                cls.register_method(method=method,
                                                     path=path,
                                                     function=function,
                                                     instance=controller_instance,

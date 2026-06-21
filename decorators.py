@@ -1,9 +1,8 @@
 def _apply_web_method(path, method):
     def wrapper(func):
-        if not hasattr(func, "web_paths") or not func.web_paths:
-            func.web_paths = []
-        func.web_paths.append(path)
-        func.web_method = method
+        if not hasattr(func, "web_methods") or not func.web_methods:
+            func.web_methods = []
+        func.web_methods.append(method + "-" + path)
         return func
 
     return wrapper
