@@ -24,6 +24,14 @@ class JinjaHelpers:
                 return d
         return ''
 
+    def date_time_format(self, d: datetime.datetime):
+        if d:
+            if hasattr(d, 'strftime'):
+                return d.strftime('%B %-d, %Y at %-I:%M %p')
+            else:
+                return d
+        return ''
+
     def date_input_format(self, d: datetime.datetime):
         """format a date into a string that a <input type="date" /> can understand"""
         if d:
