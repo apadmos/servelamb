@@ -3,6 +3,8 @@ import os
 import re
 from pathlib import Path
 
+import fancycli
+
 
 class Router(object):
     ROUTES = {}
@@ -92,16 +94,20 @@ class Router(object):
         best_groups = {}
 
         for p in cls.ROUTES:
-            m = re.match(f'^{p}$', key)
-            if m:
-                segments = p.split('/')
-                total_segments = len(segments)
-                static_segments = sum(1 for seg in segments if '(?P<' not in seg)
-                specificity = (total_segments, static_segments)
-                if specificity > best_specificity:
-                    best_specificity = specificity
-                    best_match = p
-                    best_groups = m.groupdict()
+            try:
+                m = re.match(f'^{p}$', key)
+                if m:
+                    segments = p.split('/')
+                    total_segments = len(segments)
+                    static_segments = sum(1 for seg in segments if '(?P<' not in seg)
+                    specificity = (total_segments, static_segments)
+                    if specificity > best_specificity:
+                        best_specificity = specificity
+                        best_match = p
+                        best_groups = m.groupdict()
+            except Exception as ex:
+                fancycli.print_error(f"routing error for {p}", ex)
+                raise ex
 
         if not best_match:
             return None, {}
