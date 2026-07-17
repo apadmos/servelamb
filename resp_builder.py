@@ -106,8 +106,8 @@ class RespBuilder(object):
                 autoescape=select_autoescape())
             helpers = JinjaHelpers(static_prefix=self._static_prefix)
             self._jinja.filters["date"] = helpers.date_format
+            self._jinja.filters["date_iso"] = helpers.date_iso
             self._jinja.filters["date_time"] = helpers.date_time_format
-            self._jinja.filters["input_date"] = helpers.date_input_format
             self._jinja.filters["words"] = helpers.words_split
             self._jinja.filters["words_split"] = helpers.words_split
             self._jinja.filters["localize"] = helpers.localize

@@ -5,6 +5,8 @@ from zoneinfo import ZoneInfo
 from jinja2 import Undefined
 from markupsafe import Markup
 
+import fancycli
+
 
 class JinjaHelpers:
 
@@ -24,19 +26,24 @@ class JinjaHelpers:
                 return d
         return ''
 
+    def date_iso(self, d):
+        if isinstance(d, datetime.datetime):
+            return d.date().isoformat()
+        if isinstance(d, datetime.date):
+            return d.isoformat()
+        d = str(d).strip()
+        if not d:
+            return ''
+        try:
+            return datetime.date.fromisoformat(d).isoformat()
+        except ValueError:
+            fancycli.print_error(f"Error parsing date_iso {d}")
+            return ''
+
     def date_time_format(self, d: datetime.datetime):
         if d:
             if hasattr(d, 'strftime'):
                 return d.strftime('%B %-d, %Y at %-I:%M %p')
-            else:
-                return d
-        return ''
-
-    def date_input_format(self, d: datetime.datetime):
-        """format a date into a string that a <input type="date" /> can understand"""
-        if d:
-            if hasattr(d, 'strftime'):
-                return d.strftime("%Y-%m-%d")
             else:
                 return d
         return ''
