@@ -94,12 +94,17 @@ def _check_assign(func, name, value):
         setattr(func, name, value)
 
 
-def _apply_auth_to_func(func, permission: str = None,
+def _apply_auth_to_func(func,
+                        permission: str = None,
                         namespace: str = None,
                         id: str = None,
                         auth_redirect: str = None,
                         login_redirect: str = None,
                         ):
+    """Default param values aren't working for some reason,
+    and we need at least 1 thing to be set even when all params are missing"""
+    if not permission:
+        permission = 'ANY'
     _check_assign(func, "auth_permission", permission)
     _check_assign(func, "auth_namespace", namespace)
     _check_assign(func, "auth_resource_id", id)
