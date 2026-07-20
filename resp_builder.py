@@ -117,6 +117,7 @@ class RespBuilder(object):
             self._jinja.globals["options"] = helpers.render_select_options
             self._jinja.globals["now"] = helpers.now
             self._jinja.globals["static"] = helpers.static
+            self._jinja.globals["ellipses"] = helpers.ellipses
             for func in self._jinja_functions:
                 self._jinja.globals[func] = self._jinja_functions[func]
         return self._jinja

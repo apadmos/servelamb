@@ -16,6 +16,17 @@ class JinjaHelpers:
         self.static_prefix = static_prefix
         self.LOCAL_TZ = ZoneInfo(time_zone)
 
+    def ellipses(self, t: str | None, length: int = 100) -> str:
+        if not t:
+            return ''
+        if len(t) <= length:
+            return t
+        # Find the last space within the allowed length
+        truncated = t[:length]
+        last_space = truncated.rfind(' ')
+        if last_space > 0:
+            truncated = truncated[:last_space]
+        return truncated + '...'
     """"Generic Jinja pipe filters and functions that can be used across projects"""
 
     def date_format(self, d: datetime.datetime):
