@@ -16,7 +16,8 @@ class LocalServer(BaseHTTPRequestHandler):
     def process(self, method, write=True):
 
         try:
-
+            """Lambda functions seem to strip ending flashes so mimic that here"""
+            self.path = self.path.rstrip("/")
             util = ParamParser()
 
             req = ReqWrapper()
