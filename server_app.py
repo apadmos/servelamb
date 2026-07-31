@@ -108,6 +108,8 @@ class ServerApp(object):
                 parts = req.path.split("~q~", 1)
                 qs = parts[1]
                 req.path = parts[0]
+                """always copy how AWS does it"""
+                req.path = req.path.rstrip("/")
                 qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
                 req.query = qs
 
