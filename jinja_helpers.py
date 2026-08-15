@@ -27,6 +27,7 @@ class JinjaHelpers:
         if last_space > 0:
             truncated = truncated[:last_space]
         return truncated + '...'
+
     """"Generic Jinja pipe filters and functions that can be used across projects"""
 
     def date_format(self, d: datetime.datetime):
@@ -54,7 +55,15 @@ class JinjaHelpers:
     def date_time_format(self, d: datetime.datetime):
         if d:
             if hasattr(d, 'strftime'):
-                return d.strftime('%B %-d, %Y at %-I:%M %p')
+                return d.strftime('%b %-d, %Y %-I:%M %p')
+            else:
+                return d
+        return ''
+
+    def day_of_week(self, d: datetime.datetime):
+        if d:
+            if hasattr(d, 'strftime'):
+                return d.strftime('%A')
             else:
                 return d
         return ''
