@@ -8,19 +8,19 @@ def _apply_web_method(path, method):
     return wrapper
 
 
-def get(path: str = None):
+def get(path: str | None = None):
     return _apply_web_method(path=path, method='GET')
 
 
-def post(path: str = None):
+def post(path: str | None = None):
     return _apply_web_method(path=path, method='POST')
 
 
-def delete(path: str = None):
+def delete(path: str | None = None):
     return _apply_web_method(path=path, method='DELETE')
 
 
-def put(path: str = None):
+def put(path: str | None = None):
     return _apply_web_method(path=path, method='PUT')
 
 
@@ -65,11 +65,11 @@ def _apply_header_to_cls(cls, name: str, value: str):
     return cls
 
 
-def auth(permission: str = None,
-         namespace: str = None,
-         id: str = None,
-         auth_redirect: str = None,
-         login_redirect: str = None):
+def auth(permission: str | None = None,
+         namespace: str | None = None,
+         id: str | None = None,
+         auth_redirect: str | None = None,
+         login_redirect: str | None = None):
     def apply(target):
         if isinstance(target, type):
             return _appy_auth_to_cls(cls=target,
@@ -95,11 +95,11 @@ def _check_assign(func, name, value):
 
 
 def _apply_auth_to_func(func,
-                        permission: str = None,
-                        namespace: str = None,
-                        id: str = None,
-                        auth_redirect: str = None,
-                        login_redirect: str = None,
+                        permission: str | None = None,
+                        namespace: str | None = None,
+                        id: str | None = None,
+                        auth_redirect: str | None = None,
+                        login_redirect: str | None = None,
                         ):
     """Default param values aren't working for some reason,
     and we need at least 1 thing to be set even when all params are missing"""
@@ -113,11 +113,11 @@ def _apply_auth_to_func(func,
     return func
 
 
-def _appy_auth_to_cls(cls, permission: str = None,
-                      namespace: str = None,
-                      id: str = None,
-                      auth_redirect: str = None,
-                      login_redirect: str = None):
+def _appy_auth_to_cls(cls, permission: str | None = None,
+                      namespace: str | None = None,
+                      id: str | None = None,
+                      auth_redirect: str | None = None,
+                      login_redirect: str | None = None):
     """Applies auth to every routed method on a class."""
     for attr_name in dir(cls):
         if attr_name.startswith('_'):

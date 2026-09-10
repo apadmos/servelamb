@@ -108,7 +108,7 @@ class LambdaHosting:
         req.query = self.util.to_param_dict(qs)
         return req
 
-    def format_response(self, resp: RespBuilder, additional_context: str = None):
+    def format_response(self, resp: RespBuilder, additional_context: str | None = None):
 
         body = resp.body
         print("HEADERS:", repr(resp.headers))

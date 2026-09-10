@@ -13,7 +13,8 @@ class Router(object):
     RESERVED_VERBS = ["GET", "POST", "PUT", "OPTIONS", "DELETE"]
 
     @classmethod
-    def list_controllers(cls, directory: Path, collector: set = None, module_prefix: str = None, base_dir: Path = None):
+    def list_controllers(cls, directory: Path, collector: set = None, module_prefix: str | None = None,
+                         base_dir: Path = None):
         if collector is None:
             collector = set()
         if base_dir is None:
@@ -35,7 +36,7 @@ class Router(object):
         return collector
 
     @classmethod
-    def register(cls, controller_directory, module_prefix: str = None):
+    def register(cls, controller_directory, module_prefix: str | None = None):
         controller_directory = Path(controller_directory)
 
         if not os.path.isdir(controller_directory):

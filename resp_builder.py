@@ -123,7 +123,7 @@ class RespBuilder(object):
                 self._jinja.globals[func] = self._jinja_functions[func]
         return self._jinja
 
-    def template(self, data=None, template_path=None, template_markup=None, template_name: str = None,
+    def template(self, data=None, template_path=None, template_markup=None, template_name: str | None = None,
                  status_code: int = None):
         if status_code:
             self._status = status_code
