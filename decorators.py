@@ -69,7 +69,8 @@ def auth(permission: str | None = None,
          namespace: str | None = None,
          id: str | None = None,
          auth_redirect: str | None = None,
-         login_redirect: str | None = None):
+         login_redirect: str | None = None,
+         exempt_hosts: list[str] | None = None):
     def apply(target):
         if isinstance(target, type):
             return _appy_auth_to_cls(cls=target,
@@ -77,14 +78,16 @@ def auth(permission: str | None = None,
                                      namespace=namespace,
                                      id=id,
                                      auth_redirect=auth_redirect,
-                                     login_redirect=login_redirect)
+                                     login_redirect=login_redirect,
+                                     exempt_hosts=exempt_hosts)
         else:
             return _apply_auth_to_func(func=target,
                                        permission=permission,
                                        namespace=namespace,
                                        id=id,
                                        auth_redirect=auth_redirect,
-                                       login_redirect=login_redirect)
+                                       login_redirect=login_redirect,
+                                       exempt_hosts=exempt_hosts)
 
     return apply
 
@@ -100,6 +103,7 @@ def _apply_auth_to_func(func,
                         id: str | None = None,
                         auth_redirect: str | None = None,
                         login_redirect: str | None = None,
+                        exempt_hosts: list[str] | None = None,
                         ):
     """Default param values aren't working for some reason,
     and we need at least 1 thing to be set even when all params are missing"""
@@ -110,6 +114,7 @@ def _apply_auth_to_func(func,
     _check_assign(func, "auth_resource_id", id)
     _check_assign(func, "auth_redirect", auth_redirect)
     _check_assign(func, "auth_login_redirect", login_redirect)
+    _check_assign(func, "auth_exempt_hosts", exempt_hosts)
     return func
 
 
@@ -117,7 +122,8 @@ def _appy_auth_to_cls(cls, permission: str | None = None,
                       namespace: str | None = None,
                       id: str | None = None,
                       auth_redirect: str | None = None,
-                      login_redirect: str | None = None):
+                      login_redirect: str | None = None,
+                      exempt_hosts: list[str] | None = None):
     """Applies auth to every routed method on a class."""
     for attr_name in dir(cls):
         if attr_name.startswith('_'):
@@ -128,5 +134,6 @@ def _appy_auth_to_cls(cls, permission: str | None = None,
                                                     namespace=namespace,
                                                     id=id,
                                                     auth_redirect=auth_redirect,
-                                                    login_redirect=login_redirect))
+                                                    login_redirect=login_redirect,
+                                                    exempt_hosts=exempt_hosts))
     return cls
