@@ -28,6 +28,8 @@ class ReqWrapper(object):
         }
         self.file = {
         }
+        """Parsed once from the Cookie header by the hosting layer when the request comes in"""
+        self.cookies: dict[str, str] = {}
 
         """Sessions need to be populated by a session manager in  the middle"""
         self.session_cookie = "29cc6a41e3fd"
@@ -72,34 +74,20 @@ class ReqWrapper(object):
         """
         return self._pack_objects(self.params)
 
-    def _parse_cookies(self, cookies: str, url_decode=True):
-        if not cookies:
+    def parse_cookie_header(self) -> dict[str, str]:
+        """Cookies are URL encoded when set by the resp_builder, so values are URL decoded here"""
+        cookie_header = self.headers.get("cookie")
+        if not cookie_header:
             return {}
-        r = {}
-        for part in cookies.split("; "):
-            if url_decode:
-                parsed = urllib.parse.parse_qs(part)
-                if parsed:
-                    for k, v in parsed.items():
-                        r[k] = v[0] if v else None
-            else:
-                parts = part.split("=")
-                key = parts[0]
-                """in case there is a = in the """
-                val = "=".join(parts[1:])
-                r[key] = val
-        return r
+        cookies: dict[str, str] = {}
+        for part in cookie_header.split(";"):
+            name, _, value = part.strip().partition("=")
+            if name:
+                cookies[urllib.parse.unquote_plus(name)] = urllib.parse.unquote_plus(value)
+        return cookies
 
-    def cookie(self, key: str, url_decode=True) -> str:
-        """
-        :param key: key used to set the cookie
-        :param url_decode: Cookies are URL encoded when set by the resp_builder
-        :return: cookie value as string, or None
-        """
-        cooks = self.headers.get("cookie")
-        cookies = self._parse_cookies(cooks, url_decode=url_decode)
-        val = cookies.get(key)
-        return val
+    def cookie(self, key: str) -> str | None:
+        return self.cookies.get(key)
 
     def session_id(self) -> str:
         sid = self.cookie(self.session_cookie)

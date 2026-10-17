@@ -37,6 +37,7 @@ class LocalServer(BaseHTTPRequestHandler):
             for k in self.headers.keys():
                 req.headers[k] = self.headers.get(k)
                 req.headers[k.lower()] = self.headers.get(k)
+            req.cookies = req.parse_cookie_header()
 
             content_length = self.headers.get('content-length')
             content_type = str(self.headers.get('content-type') or '').lower()

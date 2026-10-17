@@ -73,6 +73,7 @@ class LambdaHosting:
         for k in event["headers"].keys():
             req.headers[k] = event["headers"].get(k)
             req.headers[k.lower()] = event["headers"].get(k)
+        req.cookies = req.parse_cookie_header()
 
         body = {}
         if event.get("body"):
