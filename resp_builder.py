@@ -1,4 +1,5 @@
 import datetime
+import html
 import json
 import mimetypes
 import os
@@ -179,9 +180,13 @@ class RespBuilder(object):
             raise ex
 
     def js_redirect(self, goto: str):
+        """goto is often user input: json.dumps keeps it inside the JS string ("</" escaped so it can't close
+        the script tag), html.escape keeps it inside the href attribute"""
+        goto_js: str = json.dumps(goto).replace("</", "<\\/")
+        goto_attr: str = html.escape(goto, quote=True)
         return self.html(f"""<html><body><title>Redirecting...</title>
-        <script>setTimeout(function () {{ window.location.replace("{goto}");}}, 0);</script>
-<a href="{goto}">Click here to continue</a></body></html>""")
+        <script>setTimeout(function () {{ window.location.replace({goto_js});}}, 0);</script>
+<a href="{goto_attr}">Click here to continue</a></body></html>""")
 
     def not_found(self, message: str):
         return self.error(message=message, status_code=404)
