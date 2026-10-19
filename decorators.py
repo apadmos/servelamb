@@ -61,6 +61,9 @@ def _apply_header_to_cls(cls, name: str, value: str):
         if attr_name.startswith('_'):
             continue
         attr = getattr(cls, attr_name)
+        """only methods, class constants like lists and strings can't take attributes"""
+        if not callable(attr):
+            continue
         setattr(cls, attr_name, _apply_header_to_func(func=attr, name=name, value=value))
     return cls
 
@@ -135,6 +138,9 @@ def _appy_auth_to_cls(cls, permission: str | None = None,
         if attr_name.startswith('_'):
             continue
         attr = getattr(cls, attr_name)
+        """only methods, class constants like lists and strings can't take attributes"""
+        if not callable(attr):
+            continue
         setattr(cls, attr_name, _apply_auth_to_func(func=attr,
                                                     permission=permission,
                                                     namespace=namespace,
