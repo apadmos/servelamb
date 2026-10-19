@@ -27,6 +27,9 @@ class RespBuilder(object):
         self.headers = {
             "Content-Type": "text"
         }
+        """Set-Cookie strings by cookie name; a header dict can only hold one Set-Cookie, so the
+        hosting layer sends each of these as its own header. Setting the same name again replaces it."""
+        self.cookies: dict[str, str] = {}
         self._static_dir = static_dir
         self._template_dirs = template_dirs or []
         self._template_loader = template_loader
@@ -220,11 +223,9 @@ class RespBuilder(object):
         if http_only:
             cookie_string += "; HttpOnly"
 
-        current_cookie = self.headers.get("Set-Cookie")
-        if current_cookie:
-            raise NotImplemented(
-                "Sorry, you can only set 1 cookie at a time right now. Please update the code to allow multiple")
-        self.headers["Set-Cookie"] = cookie_string
+        """the last value set for a name wins"""
+        self.cookies.pop(key, None)
+        self.cookies[key] = cookie_string
         return self
 
     def error(self, message: str, status_code=500):

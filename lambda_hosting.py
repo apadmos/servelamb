@@ -27,9 +27,11 @@ class LambdaHosting:
         try:
             req = self.pack_request(event, context)
             resp = app.handle(req)
+            """function URLs / HTTP APIs send payload version 2.0, REST APIs send 1.0"""
+            is_v2: bool = event.get("version") == "2.0"
             if resp.status in [500, 404]:
-                return self.format_response(resp, additional_context=json.dumps(event))
-            return self.format_response(resp)
+                return self.format_response(resp, additional_context=json.dumps(event), is_v2=is_v2)
+            return self.format_response(resp, is_v2=is_v2)
         except Exception as ex:
             tb = traceback.format_exc()
             fancycli.print_error("Exception handling request", ex)
@@ -109,7 +111,7 @@ class LambdaHosting:
         req.query = self.util.to_param_dict(qs)
         return req
 
-    def format_response(self, resp: RespBuilder, additional_context: str | None = None):
+    def format_response(self, resp: RespBuilder, additional_context: str | None = None, is_v2: bool = True):
 
         body = resp.body
         print("HEADERS:", repr(resp.headers))
@@ -117,9 +119,17 @@ class LambdaHosting:
         if additional_context:
             body += f"\n\nADDITIONAL CONTEXT: \n{additional_context}"
 
-        return {
+        response: dict = {
             "statusCode": resp.status,
             "headers": resp.headers,
             "body": body,
             "isBase64Encoded": False
         }
+        """headers is a dict so it can't repeat Set-Cookie; each payload version has its own list for cookies"""
+        cookie_strings: list[str] = list(resp.cookies.values())
+        if cookie_strings:
+            if is_v2:
+                response["cookies"] = cookie_strings
+            else:
+                response["multiValueHeaders"] = {"Set-Cookie": cookie_strings}
+        return response

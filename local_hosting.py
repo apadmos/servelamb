@@ -62,6 +62,8 @@ class LocalServer(BaseHTTPRequestHandler):
             self.send_response(resp.status)
             for (key, val) in resp.headers.items():
                 self.send_header(key, val)
+            for cookie_string in resp.cookies.values():
+                self.send_header("Set-Cookie", cookie_string)
 
             if resp.cache_output:
                 # https://stackoverflow.com/questions/7071763/max-value-for-cache-control-header-in-http
