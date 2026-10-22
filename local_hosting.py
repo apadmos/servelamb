@@ -16,8 +16,6 @@ class LocalServer(BaseHTTPRequestHandler):
     def process(self, method, write=True):
 
         try:
-            """Lambda functions seem to strip ending flashes so mimic that here"""
-            self.path = self.path.rstrip("/")
             util = ParamParser()
 
             req = ReqWrapper()
@@ -28,7 +26,8 @@ class LocalServer(BaseHTTPRequestHandler):
             req.file = {}
 
             parts = parse.urlparse(self.path)
-            req.path = parts.path
+            """Lambda functions strip ending slashes so mimic that here (on the path, not the query string)"""
+            req.path = parts.path.rstrip("/")
             req.host = str(self.server.server_address)
 
             req.query = util.to_param_dict(parse.parse_qs(parts.query, keep_blank_values=True))

@@ -108,10 +108,11 @@ class ServerApp(object):
                 parts = req.path.split("~q~", 1)
                 qs = parts[1]
                 req.path = parts[0]
-                """always copy how AWS does it"""
-                req.path = req.path.rstrip("/")
                 qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
                 req.query = qs
+
+            """Always copy how AWS does it: no trailing slash, whether or not there was a query string"""
+            req.path = req.path.rstrip("/")
 
             """Now that we're doctoring paths, if it's totally blank go with /"""
             if not req.path:
