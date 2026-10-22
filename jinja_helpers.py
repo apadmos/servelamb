@@ -3,7 +3,7 @@ import re
 from zoneinfo import ZoneInfo
 
 from jinja2 import Undefined
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 import fancycli
 
@@ -133,9 +133,9 @@ class JinjaHelpers:
             is_selected = ' selected' if selected_val == value else ''
             if is_selected:
                 found_selected = True
-            r.append(f"""<option value="{value}"{is_selected}>{name}</option>""")
+            r.append(f"""<option value="{escape(value)}"{is_selected}>{escape(name)}</option>""")
         if not found_selected and selected is not None:
-            r.append(f"""<option value="{selected_val}" selected>{selected_name}  (Not found)</option>""")
+            r.append(f"""<option value="{escape(selected_val)}" selected>{escape(selected_name)}  (Not found)</option>""")
         r = "\n".join(r)
         return Markup(r)
 

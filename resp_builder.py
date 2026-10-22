@@ -8,7 +8,7 @@ import urllib.parse
 import uuid
 
 import jinja2
-from jinja2 import Environment, select_autoescape, FunctionLoader
+from jinja2 import Environment, FunctionLoader
 
 import fancycli
 from .jinja_helpers import JinjaHelpers
@@ -105,9 +105,11 @@ class RespBuilder(object):
     def jinja(self):
         if not self._jinja:
             """May need file system loader here https://jinja.palletsprojects.com/en/3.0.x/api/#jinja2.PackageLoader"""
+            """Everything is escaped, whatever its file name or however it was loaded.
+            Helpers that build HTML return Markup; values going into <script> or on* attributes use |tojson"""
             self._jinja = Environment(
                 loader=FunctionLoader(self.load_template),
-                autoescape=select_autoescape())
+                autoescape=True)
             helpers = JinjaHelpers(static_prefix=self._static_prefix)
             self._jinja.filters["date"] = helpers.date_format
             self._jinja.filters["date_iso"] = helpers.date_iso
