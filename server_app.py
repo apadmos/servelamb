@@ -121,6 +121,10 @@ class ServerApp(object):
             """expand the various sources of params into one location"""
             if isinstance(req.body, list):
                 req.params = Digest(body_array=req.body, **req.query)
+            elif isinstance(req.body, (bytes, bytearray)):
+                """A raw upload (application/octet-stream) stays in req.body: copying it byte by byte into params
+                would make a dict entry per byte"""
+                req.params = Digest(**req.query)
             else:
                 req.params = Digest(**req.query)
                 for key in req.body:
