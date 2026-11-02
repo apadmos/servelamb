@@ -30,6 +30,9 @@ class RespBuilder(object):
         """Set-Cookie strings by cookie name; a header dict can only hold one Set-Cookie, so the
         hosting layer sends each of these as its own header. Setting the same name again replaces it."""
         self.cookies: dict[str, str] = {}
+        """How much logging this response gets; set with log_level(). Each consumer reads it its own way
+        (for servelamb_errors it's the error log level). None: not set, the consumer's default"""
+        self.current_log_level: int | None = None
         self._static_dir = static_dir
         self._template_dirs = template_dirs or []
         self._template_loader = template_loader
@@ -228,6 +231,13 @@ class RespBuilder(object):
         """the last value set for a name wins"""
         self.cookies.pop(key, None)
         self.cookies[key] = cookie_string
+        return self
+
+    def log_level(self, level: int):
+        """How much logging this response gets. The meaning depends on who reads it; for error reporting:
+        0  no logging of any kind (not reported, counted or stored), e.g. a deliberate 410 for something gone
+        any other level: the default treatment for now; higher levels can be given meanings as they're needed"""
+        self.current_log_level = level
         return self
 
     def error(self, message: str, status_code=500, content_type='text/html'):
