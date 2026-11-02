@@ -55,9 +55,11 @@ class LambdaHosting:
             request_context: dict = event.get("requestContext") or {}
             method: str = request_context.get("httpMethod") or (request_context.get("http") or {}).get("method") or ""
             path: str = event.get("rawPath") or event.get("path") or ""
-            title: str = f"Exception handling request {method} {path}"
+            query: str = self.event_query_string(event)
+            path_and_query: str = f"{path}?{query}" if query else path
+            title: str = f"Exception handling request {method} {path_and_query}"
             fancycli.print_error(title, ex)
-            self._notify_error(title=title, details=tb)
+            self._notify_error(title=title, details=f"{self.describe_event(event)}\n\n{tb}")
             try:
                 if not self.show_error_details:
                     print(f"Request event: {json.dumps(event)}")
@@ -137,6 +139,41 @@ class LambdaHosting:
 
         req.query = self.util.to_param_dict(qs)
         return req
+
+    def event_query_string(self, event: dict) -> str:
+        """The query string as sent: rawQueryString (payload 2.0), or rebuilt from the parameters (1.0)"""
+        try:
+            raw: str = event.get("rawQueryString") or ""
+            if raw:
+                return raw
+            params: dict = event.get("multiValueQueryStringParameters") or event.get("queryStringParameters") or {}
+            return parse.urlencode(params, doseq=True)
+        except Exception:
+            return ""
+
+    def describe_event(self, event: dict) -> str:
+        """Who sent a request and what was in it, for error reports. Read straight from the Lambda event, so it
+        works even when the request couldn't be packed. Never raises"""
+        try:
+            headers: dict = {str(k).lower(): v for k, v in (event.get("headers") or {}).items()}
+            request_context: dict = event.get("requestContext") or {}
+            source_ip: str = ((request_context.get("http") or {}).get("sourceIp")
+                              or (request_context.get("identity") or {}).get("sourceIp") or "")
+            host: str = headers.get("x-forwarded-host") or headers.get("host") or ""
+            body: str = str(event.get("body") or "")
+            body_note: str = " (base64)" if event.get("isBase64Encoded") else ""
+            lines: list[str] = [
+                f"Host: {host or '(none)'}",
+                f"Query: {self.event_query_string(event) or '(none)'}",
+                f"IP: {source_ip or '(none)'}  Forwarded for: {headers.get('x-forwarded-for') or '(none)'}",
+                f"Referer: {headers.get('referer') or '(none)'}",
+                f"User agent: {headers.get('user-agent') or '(none)'}",
+                f"Content type: {headers.get('content-type') or '(none)'}",
+                f"Body{body_note}: {body[:500] if body else '(none)'}",
+            ]
+            return "\n".join(lines)
+        except Exception as describe_error:
+            return f"(request details unavailable: {describe_error!r})"
 
     def parse_body(self, raw_body: str | bytes | dict | list | None, is_base64: bool,
                    content_type: str) -> dict | list | bytes:
