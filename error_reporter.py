@@ -8,15 +8,16 @@ class ErrorReportingSettings:
     """What ErrorReporter needs from a project's config"""
 
     def __init__(self, slack_webhook_url: str = "", environment_label: str = "", throttle_minutes: float = 0,
-                 report_status_codes: list[int] | None = None, slack_mention: str = ""):
+                 report_status_codes: list[str] | None = None, slack_mention: str = ""):
         """A Slack incoming webhook; its channel (the recipient) is chosen when the webhook is created. Empty: off"""
         self.slack_webhook_url: str = slack_webhook_url
         """Shown at the start of every message, e.g. "prod" """
         self.environment_label: str = environment_label
         """At most one message per kind of error in this many minutes. 0 sends every error"""
         self.throttle_minutes: float = throttle_minutes
-        """Response statuses report_response sends, e.g. [404, 500]"""
-        self.report_status_codes: list[int] = report_status_codes or []
+        """Response statuses report_response sends. Exact codes or patterns where x or * is any digit:
+        ["4xx", "5xx"] is every error, ["404", "5**"] is not found and every server error"""
+        self.report_status_codes: list[str] = report_status_codes or []
         """Put in front of every message, e.g. "<!channel>" or "<@U012AB3CD>" to notify someone"""
         self.slack_mention: str = slack_mention
 
@@ -90,7 +91,7 @@ class ErrorReporter:
         if not settings or not settings.slack_webhook_url:
             return
         try:
-            if resp.status not in settings.report_status_codes:
+            if not cls.status_matches(status=resp.status, patterns=settings.report_status_codes):
                 return
             headers: dict = req.headers or {}
             details: str = "\n".join([
@@ -101,6 +102,17 @@ class ErrorReporter:
             cls.report(kind=str(resp.status), title=f"{resp.status} {req.method} {req.path}", details=details)
         except Exception as reporting_error:
             cls._report_own_failure(title=f"{resp.status} response", details=None, reporting_error=reporting_error)
+
+    @staticmethod
+    def status_matches(status: int, patterns: list[str]) -> bool:
+        """True when the status fits one of the patterns: "404" exactly, or "5xx" / "5**" for any 5 hundred"""
+        status_text: str = str(status)
+        for pattern in patterns:
+            pattern_text: str = str(pattern).strip().lower()
+            if len(pattern_text) == len(status_text) and all(
+                    expected in "x*" or expected == actual for expected, actual in zip(pattern_text, status_text)):
+                return True
+        return False
 
     @classmethod
     def _report_own_failure(cls, title: str, details: str | None, reporting_error: BaseException) -> None:

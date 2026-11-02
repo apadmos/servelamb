@@ -4,7 +4,6 @@ import traceback
 from urllib import parse
 
 import fancycli
-from .error_reporter import ErrorReporter
 from .param_parser import ParamParser
 from .req_wrapper import ReqWrapper
 from .resp_builder import RespBuilder
@@ -21,8 +20,20 @@ stuff just about the runtime context
 
 class LambdaHosting:
 
-    def __init__(self):
+    def __init__(self, on_error=None):
+        """on_error(title: str, details: str | None, urgent: bool) is told about every exception caught here,
+        e.g. servelamb_errors.report_exception. urgent: the exception came while handling another one"""
         self.util = ParamParser()
+        self.on_error = on_error
+
+    def _notify_error(self, title: str, details: str | None, urgent: bool = False) -> None:
+        """A failing on_error is printed and ignored, so it can't change the response"""
+        if not self.on_error:
+            return
+        try:
+            self.on_error(title, details, urgent)
+        except Exception as notify_error:
+            print(f"on_error failed: {notify_error!r}")
 
     def handle_request(self, app, event, context):
         try:
@@ -40,7 +51,7 @@ class LambdaHosting:
             path: str = event.get("rawPath") or event.get("path") or ""
             title: str = f"Exception handling request {method} {path}"
             fancycli.print_error(title, ex)
-            ErrorReporter.report(kind="exception", title=title, details=tb)
+            self._notify_error(title=title, details=tb)
             try:
                 rv = {
                     "statusCode": 500,
@@ -59,9 +70,7 @@ class LambdaHosting:
                 return rv
             except Exception as ex:
                 fancycli.print_error("Exception handling error", exception=ex)
-                """an error while handling an error skips the throttle"""
-                ErrorReporter.report(kind="exception", title="Exception handling error",
-                                     details=traceback.format_exc(), urgent=True)
+                self._notify_error(title="Exception handling error", details=traceback.format_exc(), urgent=True)
                 return {
                     "statusCode": 500,
                     "headers": {
