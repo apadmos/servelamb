@@ -4,6 +4,7 @@ import traceback
 from urllib import parse
 
 import fancycli
+from .error_reporter import ErrorReporter
 from .param_parser import ParamParser
 from .req_wrapper import ReqWrapper
 from .resp_builder import RespBuilder
@@ -34,7 +35,12 @@ class LambdaHosting:
             return self.format_response(resp, is_v2=is_v2)
         except Exception as ex:
             tb = traceback.format_exc()
-            fancycli.print_error("Exception handling request", ex)
+            request_context: dict = event.get("requestContext") or {}
+            method: str = request_context.get("httpMethod") or (request_context.get("http") or {}).get("method") or ""
+            path: str = event.get("rawPath") or event.get("path") or ""
+            title: str = f"Exception handling request {method} {path}"
+            fancycli.print_error(title, ex)
+            ErrorReporter.report(kind="exception", title=title, details=tb)
             try:
                 rv = {
                     "statusCode": 500,
@@ -47,11 +53,15 @@ class LambdaHosting:
                     }, indent=2),
                     "isBase64Encoded": False
                 }
-                fancycli.print_error("About to try and return error")
-                fancycli.print_error(rv)
+                """plain prints: these aren't new errors, so they shouldn't reach the error hook"""
+                print("About to try and return error")
+                print(rv)
                 return rv
             except Exception as ex:
                 fancycli.print_error("Exception handling error", exception=ex)
+                """an error while handling an error skips the throttle"""
+                ErrorReporter.report(kind="exception", title="Exception handling error",
+                                     details=traceback.format_exc(), urgent=True)
                 return {
                     "statusCode": 500,
                     "headers": {
