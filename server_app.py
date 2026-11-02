@@ -138,6 +138,10 @@ class ServerApp(object):
 
             """If there is a controller route that matches this path, use that first"""
             route, path_params = self.router.route(req.path, req.method)
+            if not route and req.method == "HEAD":
+                """A HEAD gets the same status and headers as a GET, so it runs the GET route; the hosting leaves
+                out the body"""
+                route, path_params = self.router.route(req.path, "GET")
             for path_param in path_params:
                 req.params[path_param] = path_params[path_param]
             if route:

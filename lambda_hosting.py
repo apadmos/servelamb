@@ -44,12 +44,17 @@ class LambdaHosting:
             resp = app.handle(req)
             """function URLs / HTTP APIs send payload version 2.0, REST APIs send 1.0"""
             is_v2: bool = event.get("version") == "2.0"
+            additional_context: str | None = None
             if resp.status in [500, 404]:
-                if not self.show_debug_info:
-                    print(f"{resp.status} request event: {json.dumps(event)}")
-                    return self.format_response(resp, is_v2=is_v2)
-                return self.format_response(resp, additional_context=json.dumps(event), is_v2=is_v2)
-            return self.format_response(resp, is_v2=is_v2)
+                event_json: str = json.dumps(event)
+                fancycli.print_error(f"{resp.status} request event: {event_json}")
+                if self.show_debug_info:
+                    additional_context = event_json
+            response: dict = self.format_response(resp, additional_context=additional_context, is_v2=is_v2)
+            if req.method == "HEAD":
+                """Same status and headers as the GET, no body"""
+                response["body"] = ""
+            return response
         except Exception as ex:
             tb = traceback.format_exc()
             request_context: dict = event.get("requestContext") or {}
