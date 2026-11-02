@@ -20,14 +20,14 @@ stuff just about the runtime context
 
 class LambdaHosting:
 
-    def __init__(self, on_error=None, show_error_details: bool = False):
+    def __init__(self, on_error=None, show_debug_info: bool = False):
         """on_error(title: str, details: str | None, urgent: bool) is told about every exception caught here,
         e.g. servelamb_errors.report_exception. urgent: the exception came while handling another one.
-        show_error_details: put the request event and traceback in error responses. Off (the default) they only
+        show_debug_info: put the request event and traceback in error responses. Off (the default) they only
         go to the logs and on_error, so visitors never see them"""
         self.util = ParamParser()
         self.on_error = on_error
-        self.show_error_details: bool = show_error_details
+        self.show_debug_info: bool = show_debug_info
 
     def _notify_error(self, title: str, details: str | None, urgent: bool = False) -> None:
         """A failing on_error is printed and ignored, so it can't change the response"""
@@ -45,7 +45,7 @@ class LambdaHosting:
             """function URLs / HTTP APIs send payload version 2.0, REST APIs send 1.0"""
             is_v2: bool = event.get("version") == "2.0"
             if resp.status in [500, 404]:
-                if not self.show_error_details:
+                if not self.show_debug_info:
                     print(f"{resp.status} request event: {json.dumps(event)}")
                     return self.format_response(resp, is_v2=is_v2)
                 return self.format_response(resp, additional_context=json.dumps(event), is_v2=is_v2)
@@ -61,7 +61,7 @@ class LambdaHosting:
             fancycli.print_error(title, ex)
             self._notify_error(title=title, details=f"{self.describe_event(event)}\n\n{tb}")
             try:
-                if not self.show_error_details:
+                if not self.show_debug_info:
                     print(f"Request event: {json.dumps(event)}")
                     return {
                         "statusCode": 500,

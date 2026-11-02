@@ -196,7 +196,7 @@ class RespBuilder(object):
         <script>setTimeout(function () {{ window.location.replace({goto_js});}}, 0);</script>
 <a href="{goto_attr}">Click here to continue</a></body></html>""")
 
-    def not_found(self, message: str):
+    def not_found(self, message: str = "Not found"):
         return self.error(message=message, status_code=404)
 
     def redirect(self, location: str, permanent=False):

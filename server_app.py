@@ -172,7 +172,7 @@ class ServerApp(object):
 
             """There's no matching controller route, search for a matching static file"""
             if not self.static_dir:
-                resp.not_found(f'server route {req.method} {req.path} not found and static files are not configured')
+                resp.not_found()
                 return resp
 
             name, ext = os.path.splitext(req.path)
@@ -193,7 +193,7 @@ class ServerApp(object):
                 if os.path.isfile(fpath):
                     return resp.file(fpath)
 
-            return resp.not_found(f'route {req.method} {req.path} {fpath} not found')
+            return resp.not_found()
         finally:
             if self.before_response:
                 self.before_response(req, resp)
