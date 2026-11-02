@@ -104,26 +104,20 @@ class LambdaHosting:
         req.form = {}
         req.file = {}
 
+        """A hand-built event (direct invoke, test event) may have no headers"""
+        event_headers: dict = event.get("headers") or {}
         req.headers = {}
-        for k in event["headers"].keys():
-            req.headers[k] = event["headers"].get(k)
-            req.headers[k.lower()] = event["headers"].get(k)
+        for k in event_headers.keys():
+            req.headers[k] = event_headers.get(k)
+            req.headers[k.lower()] = event_headers.get(k)
         req.cookies = req.parse_cookie_header()
 
-        body = {}
-        if event.get("body"):
-            body = event["body"]
-            if event["isBase64Encoded"]:
-                body = base64.b64decode(body)
-                body = body.decode('utf-8')
-
-        if req.headers.get('content-type') == 'application/json':
-            req.body = json.loads(body)
-        else:
-            req.body = self.util.to_param_dict(parse.parse_qs(body, keep_blank_values=True))
+        req.body = self.parse_body(raw_body=event.get("body"), is_base64=bool(event.get("isBase64Encoded")),
+                                   content_type=req.headers.get('content-type') or "")
 
         req.path = event.get("path") or requestContext["http"]["path"]
-        req.host = req.headers['host']
+        """HTTP/1.0 clients (some bots) can leave out Host"""
+        req.host = req.headers.get('host') or ""
 
         """ 
         "queryStringParameters": {
@@ -143,6 +137,39 @@ class LambdaHosting:
 
         req.query = self.util.to_param_dict(qs)
         return req
+
+    def parse_body(self, raw_body: str | bytes | dict | list | None, is_base64: bool,
+                   content_type: str) -> dict | list | bytes:
+        """
+        The request body as ServerApp expects it: a dict of fields, a list (a JSON array), or bytes (a raw upload).
+        Never raises: a body that can't be read is logged and treated as empty, so one bad request can't 500.
+        - HTTP events (function URLs, API Gateway, ALB) always send text, base64 encoded when isBase64Encoded
+        - a dict or list only comes from a hand-built event (direct invoke, test event) and is used as is
+        - a JSON content type can come with no body (bots send it on GETs) or with "; charset=utf-8"
+        - bytes that aren't UTF-8 (a binary upload) are passed on as bytes
+        """
+        if not raw_body:
+            return {}
+        if isinstance(raw_body, (dict, list)):
+            return raw_body
+        try:
+            body: str | bytes = raw_body
+            if is_base64:
+                body = base64.b64decode(body)
+            if isinstance(body, (bytes, bytearray)):
+                try:
+                    body = body.decode('utf-8')
+                except UnicodeDecodeError:
+                    return bytes(body)
+
+            if content_type.lower().startswith('application/json'):
+                parsed = json.loads(body)
+                """A JSON string or number has no fields to read"""
+                return parsed if isinstance(parsed, (dict, list)) else {}
+            return self.util.to_param_dict(parse.parse_qs(body, keep_blank_values=True))
+        except Exception as ex:
+            print(f"Ignoring a request body that couldn't be read ({ex!r}): {str(raw_body)[:200]!r}")
+            return {}
 
     def format_response(self, resp: RespBuilder, additional_context: str | None = None, is_v2: bool = True):
 
