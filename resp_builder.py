@@ -230,9 +230,9 @@ class RespBuilder(object):
         self.cookies[key] = cookie_string
         return self
 
-    def error(self, message: str, status_code=500):
+    def error(self, message: str, status_code=500, content_type='text/html'):
         self._body = message
-        self.headers["Content-Type"] = 'text/html'
+        self.headers["Content-Type"] = content_type
         self._status = status_code
         return self
 
