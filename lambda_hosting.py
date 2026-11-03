@@ -217,9 +217,8 @@ class LambdaHosting:
     def format_response(self, resp: RespBuilder, additional_context: str | None = None, is_v2: bool = True):
 
         body = resp.body
-        print("HEADERS:", repr(resp.headers))
-
         if additional_context:
+            """only used for error context display really"""
             body += f"\n\nADDITIONAL CONTEXT: \n{additional_context}"
 
         response: dict = {
