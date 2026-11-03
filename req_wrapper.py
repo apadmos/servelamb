@@ -10,6 +10,9 @@ class ReqWrapper(object):
         self.method: str = 'POST'
         self.static_dir = None
         self.template_dir = None
+        """Set by ServerApp.handle from its own settings, for building static asset and server URLs"""
+        self.static_prefix: str = ""
+        self.server_prefix: str = ""
         self.auth_param = None
 
         self.headers = {
@@ -28,6 +31,8 @@ class ReqWrapper(object):
         }
         self.file = {
         }
+        """Set to {} by the hosting layer"""
+        self.form: dict = {}
         """Parsed once from the Cookie header by the hosting layer when the request comes in"""
         self.cookies: dict[str, str] = {}
 

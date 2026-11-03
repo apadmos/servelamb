@@ -52,8 +52,7 @@ class LambdaHosting:
                     additional_context = event_json
             response: dict = self.format_response(resp, additional_context=additional_context, is_v2=is_v2)
             if req.method == "HEAD":
-                """Same status and headers as the GET, no body. Content-Length is what the GET's body would have
-                been; without it the function URL works one out from the empty body and sends 0"""
+                """Same status and headers as the GET, no body. The function URL sends Content-Length: 0"""
                 response["body"] = ""
             return response
         except Exception as ex:
@@ -217,8 +216,9 @@ class LambdaHosting:
     def format_response(self, resp: RespBuilder, additional_context: str | None = None, is_v2: bool = True):
 
         body = resp.body
+        print("HEADERS:", repr(resp.headers))
+
         if additional_context:
-            """only used for error context display really"""
             body += f"\n\nADDITIONAL CONTEXT: \n{additional_context}"
 
         response: dict = {
