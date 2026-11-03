@@ -23,9 +23,13 @@ class ServerApp(object):
                  middleware: list = None,
                  extensions=None,
                  before_request=None,
-                 before_response=None):
+                 before_response=None,
+                 on_missed=None):
+        """on_missed(req, resp) -> RespBuilder answers requests that matched no route and no static file.
+        Without one they get a plain text 404"""
         self.before_request = before_request
         self.before_response = before_response
+        self.on_missed = on_missed
 
         self.valid_cors_origins = valid_cors_origins
         self.router = Router()
@@ -176,8 +180,7 @@ class ServerApp(object):
 
             """There's no matching controller route, search for a matching static file"""
             if not self.static_dir:
-                resp.not_found()
-                return resp
+                return self._missed(req, resp)
 
             name, ext = os.path.splitext(req.path)
             """unify all paths to start with / """
@@ -197,7 +200,16 @@ class ServerApp(object):
                 if os.path.isfile(fpath):
                     return resp.file(fpath)
 
-            return resp.not_found()
+            return self._missed(req, resp)
         finally:
             if self.before_response:
                 self.before_response(req, resp)
+
+    def _missed(self, req: ReqWrapper, resp: RespBuilder) -> RespBuilder:
+        """No route and no static file: on_missed decides what to send. before_request runs first, as it does for a
+        route, since on_missed may need what it sets up (the database). Middleware doesn't: no route, no auth"""
+        if not self.on_missed:
+            return resp.not_found()
+        if self.before_request:
+            self.before_request(req, resp)
+        return self.on_missed(req, resp)
