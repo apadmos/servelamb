@@ -21,24 +21,29 @@ stuff just about the runtime context
 class LambdaHosting:
 
     def __init__(self, on_error=None, show_debug_info: bool = False):
-        """on_error(title: str, details: str | None, urgent: bool) is told about every exception caught here,
-        e.g. servelamb_errors.report_exception. urgent: the exception came while handling another one.
+        """on_error(title: str, details: str | None, urgent: bool, request: ReqWrapper | None) is told about every
+        exception caught here.
+        urgent: the exception came while handling another one. request: the ReqWrapper being handled, or None when
+        the request couldn't be read from the event.
         show_debug_info: put the request event and traceback in error responses. Off (the default) they only
         go to the logs and on_error, so visitors never see them"""
         self.util = ParamParser()
         self.on_error = on_error
         self.show_debug_info: bool = show_debug_info
 
-    def _notify_error(self, title: str, details: str | None, urgent: bool = False) -> None:
+    def _notify_error(self, title: str, details: str | None, urgent: bool = False,
+                      request: ReqWrapper | None = None) -> None:
         """A failing on_error is printed and ignored, so it can't change the response"""
         if not self.on_error:
             return
         try:
-            self.on_error(title, details, urgent)
+            self.on_error(title, details, urgent, request=request)
         except Exception as notify_error:
             print(f"on_error failed: {notify_error!r}")
 
     def handle_request(self, app, event, context):
+        """None until the event is read, so an exception reading it is reported without a request"""
+        req: ReqWrapper | None = None
         try:
             req = self.pack_request(event, context)
             resp = app.handle(req)
@@ -64,7 +69,7 @@ class LambdaHosting:
             path_and_query: str = f"{path}?{query}" if query else path
             title: str = f"Exception handling request {method} {path_and_query}"
             fancycli.print_error(title, ex)
-            self._notify_error(title=title, details=f"{self.describe_event(event)}\n\n{tb}")
+            self._notify_error(title=title, details=f"{self.describe_event(event)}\n\n{tb}", request=req)
             try:
                 if not self.show_debug_info:
                     print(f"Request event: {json.dumps(event)}")
@@ -91,7 +96,8 @@ class LambdaHosting:
                 return rv
             except Exception as ex:
                 fancycli.print_error("Exception handling error", exception=ex)
-                self._notify_error(title="Exception handling error", details=traceback.format_exc(), urgent=True)
+                self._notify_error(title="Exception handling error", details=traceback.format_exc(), urgent=True,
+                                   request=req)
                 return {
                     "statusCode": 500,
                     "headers": {
