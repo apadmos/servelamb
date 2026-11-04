@@ -1,4 +1,5 @@
 import os
+import re
 from urllib import parse
 
 from digest import Digest
@@ -9,6 +10,8 @@ from .router import Router
 
 
 class ServerApp(object):
+    """Everything after the last letter or digit of a request path: the trailing slash plus link junk"""
+    TRAILING_PATH_JUNK: re.Pattern = re.compile(r"[^A-Za-z0-9]+$")
 
     def __init__(self,
                  controller_dir="controllers",
@@ -115,8 +118,10 @@ class ServerApp(object):
                 qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
                 req.query = qs
 
-            """Always copy how AWS does it: no trailing slash, whether or not there was a query string"""
-            req.path = req.path.rstrip("/")
+            """Always copy how AWS does it: no trailing slash, whether or not there was a query string.
+            Punctuation that email and chat clients glue onto the end of a link goes too, so
+            /shows/show-detail/the-steel-man/) routes like /shows/show-detail/the-steel-man"""
+            req.path = self.TRAILING_PATH_JUNK.sub("", req.path)
 
             """Now that we're doctoring paths, if it's totally blank go with /"""
             if not req.path:
