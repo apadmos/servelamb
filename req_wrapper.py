@@ -1,3 +1,4 @@
+import time
 import urllib.parse
 from urllib import parse
 
@@ -5,6 +6,8 @@ from urllib import parse
 class ReqWrapper(object):
 
     def __init__(self):
+        """time.perf_counter() when the hosting started reading the request, for timing the whole response"""
+        self.received_at: float = time.perf_counter()
         self.path: str = '/some/path'
         self.host: str = 'http://localhost'
         self.method: str = 'POST'
