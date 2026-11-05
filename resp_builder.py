@@ -187,9 +187,12 @@ class RespBuilder(object):
             fancycli.print_error("Unanticipated exception type:", exception=ex)
             raise ex
 
-    def js_redirect(self, goto: str):
+    def js_redirect(self, goto: str, status_code: int | None = None):
         """goto is often user input: json.dumps keeps it inside the JS string ("</" escaped so it can't close
-        the script tag), html.escape keeps it inside the href attribute"""
+        the script tag), html.escape keeps it inside the href attribute.
+        status_code, e.g. 404: crawlers take the status and don't run the script, while people are sent on"""
+        if status_code:
+            self._status = status_code
         goto_js: str = json.dumps(goto).replace("</", "<\\/")
         goto_attr: str = html.escape(goto, quote=True)
         return self.html(f"""<html><body><title>Redirecting...</title>
