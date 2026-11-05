@@ -26,13 +26,10 @@ class ServerApp(object):
                  middleware: list = None,
                  extensions=None,
                  before_request=None,
-                 before_response=None,
-                 on_missed=None):
-        """on_missed(req, resp) -> RespBuilder answers requests that matched no route and no static file.
-        Without one they get a plain text 404"""
+                 before_response=None):
+        """generic handlers"""
         self.before_request = before_request
         self.before_response = before_response
-        self.on_missed = on_missed
 
         self.valid_cors_origins = valid_cors_origins
         self.router = Router()
@@ -79,6 +76,7 @@ class ServerApp(object):
             self.template_dir = None
         else:
             print(f"Templates will be served form {self.template_dir}")
+
         self.template_dirs = []
         if self.template_dir:
             self.template_dirs.append(self.template_dir)
@@ -95,7 +93,7 @@ class ServerApp(object):
             self.static_prefix = "/" + self.static_prefix
         print(f"Server prefix: {self.server_prefix}  Static prefix: {self.static_prefix}")
 
-    def handle(self, req: ReqWrapper) -> RespBuilder:
+    def handle(self, req: ReqWrapper) -> RespBuilder | None:
         resp = RespBuilder(static_dir=self.static_dir,
                            template_dirs=self.template_dirs,
                            template_loader=self.template_loader,
@@ -103,118 +101,105 @@ class ServerApp(object):
                            server_prefix=self.server_prefix,
                            jinja_pipes=self.jinja_pipes,
                            jinja_functions=self.jinja_functions, req=req)
-        try:
-            req.static_dir = self.static_dir
-            req.template_dir = self.template_dir
-            req.static_prefix = self.static_prefix
-            req.server_prefix = self.server_prefix
+        req.static_dir = self.static_dir
+        req.template_dir = self.template_dir
+        req.static_prefix = self.static_prefix
+        req.server_prefix = self.server_prefix
 
-            """Because of how shitty the AWS Cloudfront query string support is, we need to work around it
-            by using a placeholder"""
-            if "~q~" in req.path and not req.query:
-                parts = req.path.split("~q~", 1)
-                qs = parts[1]
-                req.path = parts[0]
-                qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
-                req.query = qs
+        """Because of how shitty the AWS Cloudfront query string support is, we need to work around it
+        by using a placeholder"""
+        if "~q~" in req.path and not req.query:
+            parts = req.path.split("~q~", 1)
+            qs = parts[1]
+            req.path = parts[0]
+            qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
+            req.query = qs
 
-            """Always copy how AWS does it: no trailing slash, whether or not there was a query string.
-            Punctuation that email and chat clients glue onto the end of a link goes too, so
-            /shows/show-detail/the-steel-man/) routes like /shows/show-detail/the-steel-man"""
-            req.path = self.TRAILING_PATH_JUNK.sub("", req.path)
+        """Always copy how AWS does it: no trailing slash, whether or not there was a query string.
+        Punctuation that email and chat clients glue onto the end of a link goes too, so
+        /shows/show-detail/the-steel-man/) routes like /shows/show-detail/the-steel-man"""
+        req.path = self.TRAILING_PATH_JUNK.sub("", req.path)
 
-            """Now that we're doctoring paths, if it's totally blank go with /"""
-            if not req.path:
-                req.path = "/"
+        """Now that we're doctoring paths, if it's totally blank go with /"""
+        if not req.path:
+            req.path = "/"
 
-            """expand the various sources of params into one location"""
-            if isinstance(req.body, list):
-                req.params = Digest(body_array=req.body, **req.query)
-            elif isinstance(req.body, (bytes, bytearray)):
-                """A raw upload (application/octet-stream) stays in req.body: copying it byte by byte into params
-                would make a dict entry per byte"""
-                req.params = Digest(**req.query)
-            else:
-                req.params = Digest(**req.query)
-                for key in req.body:
-                    req.params[key] = req.body[key]
+        """expand the various sources of params into one location"""
+        if isinstance(req.body, list):
+            req.params = Digest(body_array=req.body, **req.query)
+        elif isinstance(req.body, (bytes, bytearray)):
+            """A raw upload (application/octet-stream) stays in req.body: copying it byte by byte into params
+            would make a dict entry per byte"""
+            req.params = Digest(**req.query)
+        else:
+            req.params = Digest(**req.query)
+            for key in req.body:
+                req.params[key] = req.body[key]
 
-            """apply the policy headers that should be on all responses"""
-            if self.valid_cors_origins:
-                # self.send_header("Access-Control-Allow-Origin", host)
-                resp.headers("Access-Control-Allow-Methods", "*")
-                resp.headers("Access-Control-Allow-Credentials", "true")
+        """apply the policy headers that should be on all responses"""
+        if self.valid_cors_origins:
+            # self.send_header("Access-Control-Allow-Origin", host)
+            resp.headers("Access-Control-Allow-Methods", "*")
+            resp.headers("Access-Control-Allow-Credentials", "true")
 
-            """If there is a controller route that matches this path, use that first"""
-            route, path_params = self.router.route(req.path, req.method)
-            if not route and req.method == "HEAD":
-                """A HEAD gets the same status and headers as a GET, so it runs the GET route; the hosting leaves
-                out the body"""
-                route, path_params = self.router.route(req.path, "GET")
-            for path_param in path_params:
-                req.params[path_param] = path_params[path_param]
-            if route:
-                """if you found a route that is registered to handle this request"""
-                if self.before_request:
-                    self.before_request(req, resp)
+        """If there is a controller route that matches this path, use that first"""
+        route, path_params = self.router.route(req.path, req.method)
+        if not route and req.method == "HEAD":
+            """A HEAD gets the same status and headers as a GET, so it runs the GET route; the hosting leaves
+            out the body"""
+            route, path_params = self.router.route(req.path, "GET")
+        for path_param in path_params:
+            req.params[path_param] = path_params[path_param]
+        if route:
+            """if you found a route that is registered to handle this request"""
+            if self.before_request:
+                self.before_request(req, resp)
 
-                instance, function, auth_param = route
-                req.auth_param = auth_param
+            instance, function, auth_param = route
+            req.auth_param = auth_param
 
-                """first process middleware"""
-                for middle in self.middleware or []:
-                    if hasattr(middle, "pre_process"):
-                        resp_code = middle.pre_process(function, req, resp)
-                        if resp_code not in [0, 200]:
-                            return resp
+            """first process middleware"""
+            for middle in self.middleware or []:
+                if hasattr(middle, "pre_process"):
+                    resp_code = middle.pre_process(function, req, resp)
+                    if resp_code not in [0, 200]:
+                        return resp
 
-                """then do the route action"""
-                function(req, resp)
+            """then do the route action"""
+            function(req, resp)
 
-                """the caching or custom headers are "native" middleware """
-                if hasattr(function, "_headers"):
-                    for header in function._headers:
-                        resp.headers[header] = function._headers[header]
+            """the caching or custom headers are "native" middleware """
+            if hasattr(function, "_headers"):
+                for header in function._headers:
+                    resp.headers[header] = function._headers[header]
 
-                """do middleware post processing, for things like session storage etc"""
-                for middle in self.middleware or []:
-                    if hasattr(middle, "post_process"):
-                        middle.post_process(function, req, resp)
+            """do middleware post processing, for things like session storage etc"""
+            for middle in self.middleware or []:
+                if hasattr(middle, "post_process"):
+                    middle.post_process(function, req, resp)
 
-                return resp
+            return resp
 
-            """There's no matching controller route, search for a matching static file"""
-            if not self.static_dir:
-                return self._missed(req, resp)
+        """There's no matching controller route, search for a matching static file"""
+        if not self.static_dir:
+            return None
 
-            name, ext = os.path.splitext(req.path)
-            """unify all paths to start with / """
-            name = name.strip(" /\\")
-            """if the path starts with the static pathing prefix, strip it out cause we're only looking
-            at static files at this point"""
-            local_prefix = self.static_prefix.lstrip("/")
-            name = name[len(local_prefix):] if name.startswith(local_prefix) else name
+        name, ext = os.path.splitext(req.path)
+        """unify all paths to start with / """
+        name = name.strip(" /\\")
+        """if the path starts with the static pathing prefix, strip it out cause we're only looking
+        at static files at this point"""
+        local_prefix = self.static_prefix.lstrip("/")
+        name = name[len(local_prefix):] if name.startswith(local_prefix) else name
 
-            """attempt to serve the static file as is"""
-            fpath = os.path.join(self.static_dir, name + ext)
+        """attempt to serve the static file as is"""
+        fpath = os.path.join(self.static_dir, name + ext)
+        if os.path.isfile(fpath):
+            return resp.file(fpath)
+
+        if not ext:
+            fpath = os.path.join(self.static_dir, name, "index.html")
             if os.path.isfile(fpath):
                 return resp.file(fpath)
 
-            if not ext:
-                fpath = os.path.join(self.static_dir, name, "index.html")
-                if os.path.isfile(fpath):
-                    return resp.file(fpath)
-
-            return self._missed(req, resp)
-        finally:
-            if self.before_response:
-                self.before_response(req, resp)
-
-    def _missed(self, req: ReqWrapper, resp: RespBuilder) -> RespBuilder:
-        """No route and no static file: on_missed decides what to send. before_request runs first, as it does for a
-        route, since on_missed may need what it sets up (the database). Middleware doesn't: no route, no auth"""
-        if not self.on_missed:
-            return resp.not_found()
-        if self.before_request:
-            self.before_request(req, resp)
-        return self.on_missed(req, resp)
+        return None
