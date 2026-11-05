@@ -41,15 +41,27 @@ class LambdaHosting:
                 response["body"] = ""
             return response
         except Exception as ex:
-            request_context: dict = event.get("requestContext") or {}
-            method: str = request_context.get("httpMethod") or (request_context.get("http") or {}).get("method") or ""
-            path: str = event.get("rawPath") or event.get("path") or ""
-            query: str = self.event_query_string(event)
-            path_and_query: str = f"{path}?{query}" if query else path
-            title: str = f"Exception handling request {method} {path_and_query}"
-            details: str = f"{self.describe_event(event)}\n\n{traceback.format_exc()}"
-            fancycli.print_error(title, ex)
-            print(details)
+            """Taken first, while it's still this exception's. Describing the request can fail too (an event that
+            isn't a dict, a requestContext that isn't one), so that falls back to a generic title, and printing
+            can't stop on_failure from being called"""
+            tb: str = traceback.format_exc()
+            try:
+                request_context: dict = event.get("requestContext") or {}
+                method: str = (request_context.get("httpMethod")
+                               or (request_context.get("http") or {}).get("method") or "")
+                path: str = event.get("rawPath") or event.get("path") or ""
+                query: str = self.event_query_string(event)
+                path_and_query: str = f"{path}?{query}" if query else path
+                title: str = f"Exception handling request {method} {path_and_query}"
+                details: str = f"{self.describe_event(event)}\n\n{tb}"
+            except Exception as describe_error:
+                title = f"Exception handling an unreadable request: {ex!r}"
+                details = f"(request details unavailable: {describe_error!r})\nEvent: {str(event)[:500]!r}\n\n{tb}"
+            try:
+                fancycli.print_error(title, ex)
+                print(details)
+            except Exception as print_error:
+                print(f"Could not print the failure: {print_error!r}")
             try:
                 app.on_failure(title=title, details=details, req=req)
             except Exception as failure_error:
