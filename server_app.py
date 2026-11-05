@@ -23,14 +23,9 @@ class ServerApp(object):
                  valid_cors_origins=[],
                  jinja_pipes=None,
                  jinja_functions=None,
-                 middleware: list = None,
                  extensions=None,
-                 before_request=None,
-                 before_response=None):
-        """generic handlers"""
-        self.before_request = before_request
-        self.before_response = before_response
-
+                 look_for_index_html=True
+                 ):
         self.valid_cors_origins = valid_cors_origins
         self.router = Router()
         self.router.register(controller_directory=controller_dir)
@@ -47,7 +42,7 @@ class ServerApp(object):
                 ext_root = os.path.dirname(extension.__file__)
             if ext_root:
                 self.extension_roots.append(ext_root)
-            ext_controller_dir = os.path.join(ext_root or "", "controllers")
+            ext_controller_dir = os.path.join(str(ext_root or ""), "controllers")
             self.router.register(controller_directory=ext_controller_dir,
                                  module_prefix=ext_module_prefix)
         self.static_dir = static_dir
@@ -56,7 +51,7 @@ class ServerApp(object):
         self.server_prefix = server_prefix
         self.jinja_pipes = jinja_pipes or {}
         self.jinja_functions = jinja_functions or {}
-        self.middleware = middleware
+        self.look_for_index_html = look_for_index_html
 
         cwd = os.path.abspath(os.getcwd())
         self.working_dir = cwd
@@ -92,6 +87,43 @@ class ServerApp(object):
         if ':' not in self.static_prefix and not self.static_prefix.startswith("/"):
             self.static_prefix = "/" + self.static_prefix
         print(f"Server prefix: {self.server_prefix}  Static prefix: {self.static_prefix}")
+
+    def pre_controller(self, function, req, resp) -> RespBuilder | None:
+        """Called once the request has been fully unpacked, but no actual processing my controllers has happened
+        This is probably where you want to put your connection pooling, auth check, and other things
+        in the order you want them
+
+        Returning None continues typical processing, even if you have doctored the request or response
+        Returning a ResponseBuilder skips the controller processing and jumps to post_processing
+        and serving the response
+        """
+        return None
+
+    def post_controller(self, function, req, resp, exception) -> RespBuilder | None:
+        """Called once the controller processing has happened and a request is about to be returned,
+        or an exception is about to be thrown.
+
+        This is your change to override the response with something else
+
+        Returning None continues moves on to returning a response or throwing an unhandled exception
+        Return a ResponseBuilder serves that response blindly even if it was never completed
+        """
+        return None
+
+    def pre_not_found(self, req, resp) -> RespBuilder | None:
+        """
+        When no controller route, and no static route were found for the request.
+        When the route is a complete miss
+        This is NOT the same as a controller return a 404
+
+        :param req:
+        :param resp:
+        :return: returning None will result in a Page Not Found 404 response. If you want a custom 404 or other logic
+        return a RespBuilder and that will be returned instead of a 404
+        """
+
+    def pre_static_file(self, req, resp, fpath) -> RespBuilder | None:
+        return None
 
     def handle(self, req: ReqWrapper) -> RespBuilder | None:
         resp = RespBuilder(static_dir=self.static_dir,
@@ -139,8 +171,8 @@ class ServerApp(object):
         """apply the policy headers that should be on all responses"""
         if self.valid_cors_origins:
             # self.send_header("Access-Control-Allow-Origin", host)
-            resp.headers("Access-Control-Allow-Methods", "*")
-            resp.headers("Access-Control-Allow-Credentials", "true")
+            resp.headers["Access-Control-Allow-Methods"] = "*"
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
 
         """If there is a controller route that matches this path, use that first"""
         route, path_params = self.router.route(req.path, req.method)
@@ -152,37 +184,40 @@ class ServerApp(object):
             req.params[path_param] = path_params[path_param]
         if route:
             """if you found a route that is registered to handle this request"""
-            if self.before_request:
-                self.before_request(req, resp)
-
             instance, function, auth_param = route
             req.auth_param = auth_param
 
             """first process middleware"""
-            for middle in self.middleware or []:
-                if hasattr(middle, "pre_process"):
-                    resp_code = middle.pre_process(function, req, resp)
-                    if resp_code not in [0, 200]:
-                        return resp
+            resp_override = self.pre_controller(function, req, resp)
+            processing_error = None
+            if resp_override:
+                resp = resp_override
+            else:
+                try:
+                    """then do the route action"""
+                    function(req, resp)
+                    """the caching or custom headers are "native" middleware 
+                    TODO: Can we delete this?
+                    """
+                    if hasattr(function, "_headers"):
+                        for header in function._headers:
+                            resp.headers[header] = function._headers[header]
+                except Exception as ex:
+                    processing_error = ex
 
-            """then do the route action"""
-            function(req, resp)
-
-            """the caching or custom headers are "native" middleware """
-            if hasattr(function, "_headers"):
-                for header in function._headers:
-                    resp.headers[header] = function._headers[header]
-
-            """do middleware post processing, for things like session storage etc"""
-            for middle in self.middleware or []:
-                if hasattr(middle, "post_process"):
-                    middle.post_process(function, req, resp)
-
+            resp_override = self.post_controller(function, req, resp, processing_error)
+            if resp_override:
+                return resp_override
+            elif processing_error:
+                raise processing_error
             return resp
 
         """There's no matching controller route, search for a matching static file"""
         if not self.static_dir:
-            return None
+            resp_override = self.pre_not_found(req, resp)
+            if resp_override:
+                return resp_override
+            return resp.not_found()
 
         name, ext = os.path.splitext(req.path)
         """unify all paths to start with / """
@@ -195,11 +230,20 @@ class ServerApp(object):
         """attempt to serve the static file as is"""
         fpath = os.path.join(self.static_dir, name + ext)
         if os.path.isfile(fpath):
+            resp_override = self.pre_static_file(req, resp, fpath)
+            if resp_override:
+                return resp_override
             return resp.file(fpath)
 
-        if not ext:
+        if not ext and self.look_for_index_html:
             fpath = os.path.join(self.static_dir, name, "index.html")
             if os.path.isfile(fpath):
+                resp_override = self.pre_static_file(req, resp, fpath)
+                if resp_override:
+                    return resp_override
                 return resp.file(fpath)
 
-        return None
+        resp_override = self.pre_not_found(req, resp)
+        if resp_override:
+            return resp_override
+        return resp.not_found()
