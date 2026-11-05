@@ -20,13 +20,14 @@ class ServerApp(object):
                  template_loader=None,
                  static_prefix="static",
                  server_prefix="",
-                 valid_cors_origins=[],
+                 valid_cors_origins: list[str] | None = None,
                  jinja_pipes=None,
                  jinja_functions=None,
                  extensions=None,
                  look_for_index_html=True
                  ):
-        self.valid_cors_origins = valid_cors_origins
+        """Origins (scheme, host and port, e.g. https://www.example.org) a browser may call this app from"""
+        self.valid_cors_origins: list[str] = valid_cors_origins or []
         self.router = Router()
         self.router.register(controller_directory=controller_dir)
         self.extensions = extensions or []
@@ -88,44 +89,48 @@ class ServerApp(object):
             self.static_prefix = "/" + self.static_prefix
         print(f"Server prefix: {self.server_prefix}  Static prefix: {self.static_prefix}")
 
-    def pre_controller(self, function, req, resp) -> RespBuilder | None:
-        """Called once the request has been fully unpacked, but no actual processing my controllers has happened
-        This is probably where you want to put your connection pooling, auth check, and other things
-        in the order you want them
+    """
+    Hooks, in the order they run. Each one that returns a RespBuilder replaces the response and ends the processing;
+    None carries on. Override them in a subclass; none of them do anything here.
+    """
 
-        Returning None continues typical processing, even if you have doctored the request or response
-        Returning a ResponseBuilder skips the controller processing and jumps to post_processing
-        and serving the response
-        """
+    def pre_process(self, req, resp) -> RespBuilder | None:
+        """First thing, before the request is unpacked or routed"""
         return None
 
-    def post_controller(self, function, req, resp, exception) -> RespBuilder | None:
-        """Called once the controller processing has happened and a request is about to be returned,
-        or an exception is about to be thrown.
+    def pre_controller(self, function, req, resp) -> RespBuilder | None:
+        """A route matched and the request is unpacked, but the controller hasn't run. This is probably where you
+        want your connection pooling, auth check and other things, in the order you want them. Only routed requests
+        get here, so a static file never opens a connection. A RespBuilder skips the controller"""
+        return None
 
-        This is your change to override the response with something else
+    def post_controller(self, function, req, resp) -> RespBuilder | None:
+        """The controller ran without raising (an exception goes to pre_exception instead). This is your chance to
+        change the response, or to persist what the controller left on it, like the session"""
+        return None
 
-        Returning None continues moves on to returning a response or throwing an unhandled exception
-        Return a ResponseBuilder serves that response blindly even if it was never completed
-        """
+    def pre_static_file(self, req, resp, fpath) -> RespBuilder | None:
+        """No route matched and fpath is the static file about to be served"""
         return None
 
     def pre_not_found(self, req, resp) -> RespBuilder | None:
-        """
-        When no controller route, and no static route were found for the request.
-        When the route is a complete miss
-        This is NOT the same as a controller return a 404
-
-        :param req:
-        :param resp:
-        :return: returning None will result in a Page Not Found 404 response. If you want a custom 404 or other logic
-        return a RespBuilder and that will be returned instead of a 404
-        """
-
-    def pre_static_file(self, req, resp, fpath) -> RespBuilder | None:
+        """No controller route and no static file: a complete miss. This is NOT the same as a controller returning
+        a 404. None sends the plain 404"""
         return None
 
-    def handle(self, req: ReqWrapper) -> RespBuilder | None:
+    def pre_exception(self, req, resp, exception: Exception) -> RespBuilder | None:
+        """Anything above raised, a hook or the controller. resp is whatever was built before it did, so start
+        over with resp.error(...) or similar. None lets the exception go on to the hosting"""
+        return None
+
+    def post_process(self, req, resp, exception: Exception | None) -> None:
+        """Always last, in a finally, so it can clean up what any other step set up (close connections) and log
+        the outcome. resp is the response being sent; exception is set when one is going on to the hosting
+        (pre_exception returned None). Shouldn't raise: it would replace the response or the exception"""
+        return None
+
+    def handle(self, req: ReqWrapper) -> RespBuilder:
+        """Every return in the try sets resp first, so post_process gets the response that's actually sent"""
         resp = RespBuilder(static_dir=self.static_dir,
                            template_dirs=self.template_dirs,
                            template_loader=self.template_loader,
@@ -133,117 +138,118 @@ class ServerApp(object):
                            server_prefix=self.server_prefix,
                            jinja_pipes=self.jinja_pipes,
                            jinja_functions=self.jinja_functions, req=req)
-        req.static_dir = self.static_dir
-        req.template_dir = self.template_dir
-        req.static_prefix = self.static_prefix
-        req.server_prefix = self.server_prefix
-
-        """Because of how shitty the AWS Cloudfront query string support is, we need to work around it
-        by using a placeholder"""
-        if "~q~" in req.path and not req.query:
-            parts = req.path.split("~q~", 1)
-            qs = parts[1]
-            req.path = parts[0]
-            qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
-            req.query = qs
-
-        """Always copy how AWS does it: no trailing slash, whether or not there was a query string.
-        Punctuation that email and chat clients glue onto the end of a link goes too, so
-        /shows/show-detail/the-steel-man/) routes like /shows/show-detail/the-steel-man"""
-        req.path = self.TRAILING_PATH_JUNK.sub("", req.path)
-
-        """Now that we're doctoring paths, if it's totally blank go with /"""
-        if not req.path:
-            req.path = "/"
-
-        """expand the various sources of params into one location"""
-        if isinstance(req.body, list):
-            req.params = Digest(body_array=req.body, **req.query)
-        elif isinstance(req.body, (bytes, bytearray)):
-            """A raw upload (application/octet-stream) stays in req.body: copying it byte by byte into params
-            would make a dict entry per byte"""
-            req.params = Digest(**req.query)
-        else:
-            req.params = Digest(**req.query)
-            for key in req.body:
-                req.params[key] = req.body[key]
-
-        """apply the policy headers that should be on all responses"""
-        if self.valid_cors_origins:
-            # self.send_header("Access-Control-Allow-Origin", host)
-            resp.headers["Access-Control-Allow-Methods"] = "*"
-            resp.headers["Access-Control-Allow-Credentials"] = "true"
-
-        """If there is a controller route that matches this path, use that first"""
-        route, path_params = self.router.route(req.path, req.method)
-        if not route and req.method == "HEAD":
-            """A HEAD gets the same status and headers as a GET, so it runs the GET route; the hosting leaves
-            out the body"""
-            route, path_params = self.router.route(req.path, "GET")
-        for path_param in path_params:
-            req.params[path_param] = path_params[path_param]
-        if route:
-            """if you found a route that is registered to handle this request"""
-            instance, function, auth_param = route
-            req.auth_param = auth_param
-
-            """first process middleware"""
-            resp_override = self.pre_controller(function, req, resp)
-            processing_error = None
-            if resp_override:
+        unhandled: Exception | None = None
+        try:
+            resp_override = self.pre_process(req, resp)
+            if resp_override is not None:
                 resp = resp_override
+                return resp
+
+            req.static_dir = self.static_dir
+            req.template_dir = self.template_dir
+            req.static_prefix = self.static_prefix
+            req.server_prefix = self.server_prefix
+
+            """Because of how shitty the AWS Cloudfront query string support is, we need to work around it
+            by using a placeholder"""
+            if "~q~" in req.path and not req.query:
+                parts = req.path.split("~q~", 1)
+                qs = parts[1]
+                req.path = parts[0]
+                qs = self.util.to_param_dict(parse.parse_qs(qs, keep_blank_values=True))
+                req.query = qs
+
+            """Always copy how AWS does it: no trailing slash, whether or not there was a query string.
+            Punctuation that email and chat clients glue onto the end of a link goes too, so
+            /shows/show-detail/the-steel-man/) routes like /shows/show-detail/the-steel-man"""
+            req.path = self.TRAILING_PATH_JUNK.sub("", req.path)
+
+            """Now that we're doctoring paths, if it's totally blank go with /"""
+            if not req.path:
+                req.path = "/"
+
+            """expand the various sources of params into one location"""
+            if isinstance(req.body, list):
+                req.params = Digest(body_array=req.body, **req.query)
+            elif isinstance(req.body, (bytes, bytearray)):
+                """A raw upload (application/octet-stream) stays in req.body: copying it byte by byte into params
+                would make a dict entry per byte"""
+                req.params = Digest(**req.query)
             else:
-                try:
-                    """then do the route action"""
-                    function(req, resp)
-                    """the caching or custom headers are "native" middleware 
-                    TODO: Can we delete this?
-                    """
-                    if hasattr(function, "_headers"):
-                        for header in function._headers:
-                            resp.headers[header] = function._headers[header]
-                except Exception as ex:
-                    processing_error = ex
+                req.params = Digest(**req.query)
+                for key in req.body:
+                    req.params[key] = req.body[key]
 
-            resp_override = self.post_controller(function, req, resp, processing_error)
-            if resp_override:
-                return resp_override
-            elif processing_error:
-                raise processing_error
-            return resp
+            """CORS: only an Origin in valid_cors_origins is allowed. It's echoed back rather than "*", which
+            browsers refuse alongside credentials. Vary tells caches the response depends on the Origin"""
+            origin: str = req.headers.get("origin") or ""
+            if origin and origin in self.valid_cors_origins:
+                resp.headers["Access-Control-Allow-Origin"] = origin
+                resp.headers["Access-Control-Allow-Methods"] = "*"
+                resp.headers["Access-Control-Allow-Credentials"] = "true"
+                resp.headers["Vary"] = "Origin"
 
-        """There's no matching controller route, search for a matching static file"""
-        if not self.static_dir:
-            resp_override = self.pre_not_found(req, resp)
-            if resp_override:
-                return resp_override
-            return resp.not_found()
+            """If there is a controller route that matches this path, use that first"""
+            route, path_params = self.router.route(req.path, req.method)
+            if not route and req.method == "HEAD":
+                """A HEAD gets the same status and headers as a GET, so it runs the GET route; the hosting leaves
+                out the body"""
+                route, path_params = self.router.route(req.path, "GET")
+            for path_param in path_params:
+                req.params[path_param] = path_params[path_param]
+            if route:
+                _instance, function, auth_param = route
+                req.auth_param = auth_param
 
-        name, ext = os.path.splitext(req.path)
-        """unify all paths to start with / """
-        name = name.strip(" /\\")
-        """if the path starts with the static pathing prefix, strip it out cause we're only looking
-        at static files at this point"""
-        local_prefix = self.static_prefix.lstrip("/")
-        name = name[len(local_prefix):] if name.startswith(local_prefix) else name
+                resp_override = self.pre_controller(function, req, resp)
+                if resp_override is not None:
+                    resp = resp_override
+                    return resp
 
-        """attempt to serve the static file as is"""
-        fpath = os.path.join(self.static_dir, name + ext)
-        if os.path.isfile(fpath):
-            resp_override = self.pre_static_file(req, resp, fpath)
-            if resp_override:
-                return resp_override
-            return resp.file(fpath)
+                function(req, resp)
 
-        if not ext and self.look_for_index_html:
-            fpath = os.path.join(self.static_dir, name, "index.html")
-            if os.path.isfile(fpath):
+                """Headers from the @header and @cache decorators, once the controller has finished without raising,
+                so an error response never picks up a cache header. They're defaults: a header the controller set
+                itself wins"""
+                for name, value in (getattr(function, "_headers", None) or {}).items():
+                    resp.headers.setdefault(name, value)
+
+                resp_override = self.post_controller(function, req, resp)
+                if resp_override is not None:
+                    resp = resp_override
+                return resp
+
+            """There's no matching controller route, search for a matching static file"""
+            fpath: str | None = None
+            if self.static_dir:
+                name, ext = os.path.splitext(req.path)
+                """unify all paths to start with / """
+                name = name.strip(" /\\")
+                """if the path starts with the static pathing prefix, strip it out cause we're only looking
+                at static files at this point"""
+                local_prefix = self.static_prefix.lstrip("/")
+                name = name[len(local_prefix):] if name.startswith(local_prefix) else name
+
+                """the file as is, or a folder's index.html"""
+                candidates: list[str] = [os.path.join(self.static_dir, name + ext)]
+                if not ext and self.look_for_index_html:
+                    candidates.append(os.path.join(self.static_dir, name, "index.html"))
+                fpath = next((candidate for candidate in candidates if os.path.isfile(candidate)), None)
+
+            if fpath:
                 resp_override = self.pre_static_file(req, resp, fpath)
-                if resp_override:
-                    return resp_override
-                return resp.file(fpath)
+                resp = resp_override if resp_override is not None else resp.file(fpath)
+                return resp
 
-        resp_override = self.pre_not_found(req, resp)
-        if resp_override:
-            return resp_override
-        return resp.not_found()
+            resp_override = self.pre_not_found(req, resp)
+            resp = resp_override if resp_override is not None else resp.not_found()
+            return resp
+        except Exception as exception:
+            resp_override = self.pre_exception(req, resp, exception)
+            if resp_override is None:
+                unhandled = exception
+                raise
+            resp = resp_override
+            return resp
+        finally:
+            self.post_process(req, resp, unhandled)
