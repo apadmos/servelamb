@@ -64,7 +64,9 @@ def _apply_header_to_cls(cls, name: str, value: str):
         """only methods, class constants like lists and strings can't take attributes"""
         if not callable(attr):
             continue
-        setattr(cls, attr_name, _apply_header_to_func(func=attr, name=name, value=value))
+        """Marked in place, never set back on the class: that would turn a staticmethod or classmethod into a plain
+        method. A classmethod comes back bound, so its attributes go on the function underneath"""
+        _apply_header_to_func(func=getattr(attr, "__func__", attr), name=name, value=value)
     return cls
 
 
@@ -141,12 +143,13 @@ def _appy_auth_to_cls(cls, permission: str | None = None,
         """only methods, class constants like lists and strings can't take attributes"""
         if not callable(attr):
             continue
-        setattr(cls, attr_name, _apply_auth_to_func(func=attr,
-                                                    permission=permission,
-                                                    namespace=namespace,
-                                                    id=id,
-                                                    auth_redirect=auth_redirect,
-                                                    login_redirect=login_redirect,
-                                                    exempt_hosts=exempt_hosts,
-                                                    enforced_hosts=enforced_hosts))
+        """Marked in place, as in _apply_header_to_cls"""
+        _apply_auth_to_func(func=getattr(attr, "__func__", attr),
+                            permission=permission,
+                            namespace=namespace,
+                            id=id,
+                            auth_redirect=auth_redirect,
+                            login_redirect=login_redirect,
+                            exempt_hosts=exempt_hosts,
+                            enforced_hosts=enforced_hosts)
     return cls
