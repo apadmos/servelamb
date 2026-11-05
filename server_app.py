@@ -129,6 +129,12 @@ class ServerApp(object):
         (pre_exception returned None). Shouldn't raise: it would replace the response or the exception"""
         return None
 
+    def on_failure(self, title: str, details: str, req: ReqWrapper | None) -> None:
+        """Not part of handle: the hosting calls it when something got past handle (a hook raised) or the request
+        couldn't even be read (req is None). It has already printed it and sends a plain 500 whatever this does.
+        title names the request; details are who sent it and the traceback"""
+        return None
+
     def handle(self, req: ReqWrapper) -> RespBuilder:
         """Every return in the try sets resp first, so post_process gets the response that's actually sent"""
         resp = RespBuilder(static_dir=self.static_dir,

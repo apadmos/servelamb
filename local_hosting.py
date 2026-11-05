@@ -56,6 +56,7 @@ class LocalServer(BaseHTTPRequestHandler):
                     else:
                         req.body = util.to_param_dict(parse.parse_qs(field_data, keep_blank_values=True))
 
+            """The app answers its own exceptions (ServerApp.pre_exception); one it doesn't gets the error page below"""
             resp: RespBuilder = LocalServer.main_app.handle(req)
 
             self.send_response(resp.status)

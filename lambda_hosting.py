@@ -20,92 +20,46 @@ stuff just about the runtime context
 
 class LambdaHosting:
 
-    def __init__(self, on_error=None, show_debug_info: bool = False):
-        """on_error(title: str, details: str | None, urgent: bool, request: ReqWrapper | None) is told about every
-        exception caught here.
-        urgent: the exception came while handling another one. request: the ReqWrapper being handled, or None when
-        the request couldn't be read from the event.
-        show_debug_info: put the request event and traceback in error responses. Off (the default) they only
-        go to the logs and on_error, so visitors never see them"""
+    def __init__(self):
         self.util = ParamParser()
-        self.on_error = on_error
-        self.show_debug_info: bool = show_debug_info
-
-    def _notify_error(self, title: str, details: str | None, urgent: bool = False,
-                      request: ReqWrapper | None = None) -> None:
-        """A failing on_error is printed and ignored, so it can't change the response"""
-        if not self.on_error:
-            return
-        try:
-            self.on_error(title, details, urgent, request=request)
-        except Exception as notify_error:
-            print(f"on_error failed: {notify_error!r}")
 
     def handle_request(self, app, event, context):
-        """None until the event is read, so an exception reading it is reported without a request"""
+        """The app answers everything it can, exceptions included (ServerApp.pre_exception). What reaches the except
+        here is a real failure: an event that couldn't be read, or an app hook that raised. It's printed with the
+        event for the logs, passed to the app's on_failure, and answered with a plain 500"""
         req: ReqWrapper | None = None
         try:
             req = self.pack_request(event, context)
-            resp = app.handle(req)
+            resp: RespBuilder = app.handle(req)
             """function URLs / HTTP APIs send payload version 2.0, REST APIs send 1.0"""
             is_v2: bool = event.get("version") == "2.0"
-            additional_context: str | None = None
             if resp.status in [500, 404]:
-                event_json: str = json.dumps(event)
-                fancycli.print_error(f"{resp.status} request event: {event_json}")
-                if self.show_debug_info:
-                    additional_context = event_json
-            response: dict = self.format_response(resp, additional_context=additional_context, is_v2=is_v2)
+                fancycli.print_error(f"{resp.status} request event: {json.dumps(event)}")
+            response: dict = self.format_response(resp, is_v2=is_v2)
             if req.method == "HEAD":
                 """Same status and headers as the GET, no body. The function URL sends Content-Length: 0"""
                 response["body"] = ""
             return response
         except Exception as ex:
-            tb = traceback.format_exc()
             request_context: dict = event.get("requestContext") or {}
             method: str = request_context.get("httpMethod") or (request_context.get("http") or {}).get("method") or ""
             path: str = event.get("rawPath") or event.get("path") or ""
             query: str = self.event_query_string(event)
             path_and_query: str = f"{path}?{query}" if query else path
             title: str = f"Exception handling request {method} {path_and_query}"
+            details: str = f"{self.describe_event(event)}\n\n{traceback.format_exc()}"
             fancycli.print_error(title, ex)
-            self._notify_error(title=title, details=f"{self.describe_event(event)}\n\n{tb}", request=req)
+            print(details)
             try:
-                if not self.show_debug_info:
-                    print(f"Request event: {json.dumps(event)}")
-                    return {
-                        "statusCode": 500,
-                        "headers": {"Content-Type": "text/plain"},
-                        "body": "Something went wrong. Please try again later.",
-                        "isBase64Encoded": False
-                    }
-                rv = {
-                    "statusCode": 500,
-                    "headers": {
-                        "Content-Type": 'application/json'
-                    },
-                    "body": json.dumps({
-                        "event": event,
-                        "trace": tb
-                    }, indent=2),
-                    "isBase64Encoded": False
-                }
-                """plain prints: these aren't new errors, so they shouldn't reach the error hook"""
-                print("About to try and return error")
-                print(rv)
-                return rv
-            except Exception as ex:
-                fancycli.print_error("Exception handling error", exception=ex)
-                self._notify_error(title="Exception handling error", details=traceback.format_exc(), urgent=True,
-                                   request=req)
-                return {
-                    "statusCode": 500,
-                    "headers": {
-                        "Content-Type": 'text/plain'
-                    },
-                    "body": "Second layer exception",
-                    "isBase64Encoded": False
-                }
+                app.on_failure(title=title, details=details, req=req)
+            except Exception as failure_error:
+                print(f"on_failure failed: {failure_error!r}")
+            return {
+                "statusCode": 500,
+                "headers": {"Content-Type": "text/plain"},
+                "body": "Something went wrong. Please try again later.",
+                "isBase64Encoded": False
+            }
 
     def pack_request(self, event, context):
         req = ReqWrapper()
@@ -219,14 +173,9 @@ class LambdaHosting:
             print(f"Ignoring a request body that couldn't be read ({ex!r}): {str(raw_body)[:200]!r}")
             return {}
 
-    def format_response(self, resp: RespBuilder, additional_context: str | None = None, is_v2: bool = True):
+    def format_response(self, resp: RespBuilder, is_v2: bool = True):
 
         body = resp.body
-        print("HEADERS:", repr(resp.headers))
-
-        if additional_context:
-            body += f"\n\nADDITIONAL CONTEXT: \n{additional_context}"
-
         response: dict = {
             "statusCode": resp.status,
             "headers": resp.headers,
