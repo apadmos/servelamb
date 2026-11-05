@@ -234,9 +234,9 @@ class RespBuilder(object):
         return self
 
     def log_level(self, level: int):
-        """How much logging this response gets. The meaning depends on who reads it; for error reporting:
-        0  no logging of any kind (not reported, counted or stored), e.g. a deliberate 410 for something gone
-        any other level: the default treatment for now; higher levels can be given meanings as they're needed"""
+        """How much logging this response gets. The meaning depends on who reads it, but 0 is always no logging of any
+        kind (not reported, counted or stored), e.g. a deliberate 410 for something gone. Not set is the reader's
+        default. The CMS reads 1 as counted only and 2 as logged in detail (TrafficService)"""
         self.current_log_level = level
         return self
 
